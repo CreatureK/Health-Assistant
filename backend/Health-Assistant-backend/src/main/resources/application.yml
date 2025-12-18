@@ -8,6 +8,19 @@ spring:
     url: jdbc:mysql://localhost:3306/health_assistant?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: root
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 # MyBatis配置
 mybatis:
@@ -27,6 +40,14 @@ server:
 jwt:
   secret: health-assistant-secret-key-2025-change-in-production
   expiration: 86400000  # 24小时（毫秒）
+
+# 验证码配置
+captcha:
+  width: 120  # 验证码图片宽度
+  height: 40  # 验证码图片高度
+  length: 4   # 验证码字符长度
+  expire-seconds: 120  # 验证码过期时间（秒）
+  chars: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"  # 验证码字符集（数字+大写字母）
 
 # Swagger配置
 springdoc:

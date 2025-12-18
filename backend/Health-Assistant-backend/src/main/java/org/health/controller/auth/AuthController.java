@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.health.common.Result;
 import org.health.service.auth.AuthService;
+import org.health.service.auth.CaptchaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,22 +27,27 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private CaptchaService captchaService;
+
     /**
      * 登录接口
      * POST /api/v1/auth/login
      */
     @Operation(summary = "用户登录", description = "通过用户名和密码登录，返回JWT Token")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "登录成功",
-                    content = @Content(schema = @Schema(implementation = AuthService.LoginResult.class))),
+            @ApiResponse(responseCode = "200", description = "登录成功", content = @Content(schema = @Schema(implementation = AuthService.LoginResult.class))),
             @ApiResponse(responseCode = "400", description = "参数错误"),
             @ApiResponse(responseCode = "401", description = "用户名或密码错误")
     })
     @PostMapping("/login")
     public Result<AuthService.LoginResult> login(
-            @Parameter(description = "登录请求参数", required = true)
-            @RequestBody LoginRequest request) {
-        AuthService.LoginResult result = authService.login(request.getUsername(), request.getPassword());
+            @Parameter(description = "登录请求参数", required = true) @RequestBody LoginRequest request) {
+        AuthService.LoginResult result = authService.login(
+                request.getUsername(),
+                request.getPassword(),
+                request.getCaptchaId(),
+                request.getCaptchaCode());
         return Result.success(result);
     }
 
@@ -51,37 +57,38 @@ public class AuthController {
      */
     @Operation(summary = "用户注册", description = "注册新用户账号")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "注册成功",
-                    content = @Content(schema = @Schema(implementation = RegisterResponse.class))),
+            @ApiResponse(responseCode = "200", description = "注册成功", content = @Content(schema = @Schema(implementation = RegisterResponse.class))),
             @ApiResponse(responseCode = "400", description = "参数错误"),
             @ApiResponse(responseCode = "409", description = "用户名已存在")
     })
     @PostMapping("/register")
     public Result<RegisterResponse> register(
-            @Parameter(description = "注册请求参数", required = true)
-            @RequestBody RegisterRequest request) {
-        Long userId = authService.register(request.getUsername(), request.getPassword());
+            @Parameter(description = "注册请求参数", required = true) @RequestBody RegisterRequest request) {
+        Long userId = authService.register(
+                request.getUsername(),
+                request.getPassword(),
+                request.getCaptchaId(),
+                request.getCaptchaCode());
         RegisterResponse response = new RegisterResponse();
         response.setId(userId);
         return Result.success(response);
     }
 
     /**
-     * 获取验证码接口（暂未实现，返回占位数据）
+     * 获取验证码接口
      * GET /api/v1/auth/captcha
      */
     @Operation(summary = "获取验证码", description = "获取图形验证码，用于登录和注册")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "获取成功",
-                    content = @Content(schema = @Schema(implementation = CaptchaResponse.class)))
+            @ApiResponse(responseCode = "200", description = "获取成功", content = @Content(schema = @Schema(implementation = CaptchaResponse.class)))
     })
     @GetMapping("/captcha")
     public Result<CaptchaResponse> getCaptcha() {
-        // TODO: 实现验证码生成逻辑
+        CaptchaService.CaptchaResult captchaResult = captchaService.generateCaptcha();
         CaptchaResponse response = new CaptchaResponse();
-        response.setCaptchaId("captcha_" + System.currentTimeMillis());
-        response.setImageBase64("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
-        response.setExpireIn(120);
+        response.setCaptchaId(captchaResult.getCaptchaId());
+        response.setImageBase64(captchaResult.getImageBase64());
+        response.setExpireIn(captchaResult.getExpireIn());
         return Result.success(response);
     }
 
@@ -245,4 +252,3 @@ public class AuthController {
         }
     }
 }
-

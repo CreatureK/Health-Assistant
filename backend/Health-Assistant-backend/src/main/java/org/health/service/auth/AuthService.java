@@ -20,14 +20,22 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private CaptchaService captchaService;
+
     /**
      * 用户登录
      *
-     * @param username 用户名
-     * @param password 密码
+     * @param username    用户名
+     * @param password    密码
+     * @param captchaId   验证码ID
+     * @param captchaCode 验证码
      * @return Token和用户信息
      */
-    public LoginResult login(String username, String password) {
+    public LoginResult login(String username, String password, String captchaId, String captchaCode) {
+        // 验证验证码
+        captchaService.validateCaptcha(captchaId, captchaCode);
+
         // 查询用户
         User user = userMapper.selectByUsername(username);
         if (user == null) {
@@ -58,11 +66,16 @@ public class AuthService {
     /**
      * 用户注册
      *
-     * @param username 用户名
-     * @param password 密码
+     * @param username    用户名
+     * @param password    密码
+     * @param captchaId   验证码ID
+     * @param captchaCode 验证码
      * @return 用户ID
      */
-    public Long register(String username, String password) {
+    public Long register(String username, String password, String captchaId, String captchaCode) {
+        // 验证验证码
+        captchaService.validateCaptcha(captchaId, captchaCode);
+
         // 检查用户名是否已存在
         User existingUser = userMapper.selectByUsername(username);
         if (existingUser != null) {
@@ -115,7 +128,7 @@ public class AuthService {
             @Schema(description = "昵称", example = "张三")
             private String nickname;
 
-            @Schema(description = "角色", example = "elder", allowableValues = {"elder", "family"})
+            @Schema(description = "角色", example = "elder", allowableValues = { "elder", "family" })
             private String role;
 
             public Long getId() {
@@ -144,4 +157,3 @@ public class AuthService {
         }
     }
 }
-

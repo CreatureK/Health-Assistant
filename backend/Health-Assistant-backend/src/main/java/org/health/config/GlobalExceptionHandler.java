@@ -2,6 +2,7 @@ package org.health.config;
 
 import org.health.common.Result;
 import org.health.common.ResultCode;
+import org.health.exception.CaptchaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.validation.BindException;
@@ -60,6 +61,15 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 验证码异常
+     */
+    @ExceptionHandler(CaptchaException.class)
+    public Result<?> handleCaptchaException(CaptchaException e) {
+        logger.warn("验证码异常: {}", e.getMessage());
+        return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+    }
+
+    /**
      * 运行时异常
      */
     @ExceptionHandler(RuntimeException.class)
@@ -77,4 +87,3 @@ public class GlobalExceptionHandler {
         return Result.error(ResultCode.INTERNAL_SERVER_ERROR, "系统异常，请稍后重试");
     }
 }
-
