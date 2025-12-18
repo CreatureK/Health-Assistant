@@ -1,0 +1,130 @@
+/* .page { padding: 40rpx; }
+.card { background:#fff; border-radius:20rpx; padding:40rpx; box-shadow:0 10rpx 30rpx rgba(0,0,0,0.06); }
+.title { font-size:40rpx; font-weight:700; margin-bottom:30rpx; }
+.form-item { margin-bottom:26rpx; }
+.label { display:block; font-size:26rpx; color:#666; margin-bottom:10rpx; }
+.input { border:1rpx solid #e5e5e5; border-radius:12rpx; padding:22rpx; font-size:30rpx; background:#fafafa; }
+.btn.primary { background:#07c160; color:#fff; border-radius:12rpx; } */
+.page {
+  min-height: 100vh;
+  padding: 48rpx 32rpx;
+  background: #f7f8fa;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx 32rpx;
+  box-sizing: border-box;
+  /* 更像小程序的轻阴影 */
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.06);
+}
+
+.header {
+  margin-bottom: 28rpx;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: 1rpx;
+}
+
+.sub {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: #8a8f99;
+}
+
+.form {
+  margin-top: 12rpx;
+}
+
+.field {
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #eef0f3;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+}
+
+.label {
+  font-size: 26rpx;
+  color: #222;
+}
+
+.link {
+  font-size: 24rpx;
+  color: #07c160; /* 微信绿 */
+}
+
+.input {
+  height: 84rpx;
+  padding: 0 18rpx;
+  font-size: 30rpx;
+  color: #111;
+  background: #f6f7f9;
+  border-radius: 16rpx;
+  box-sizing: border-box;
+}
+
+.captcha-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  margin-top: 10rpx;
+}
+
+.captcha-row .input {
+  flex: 1;
+}
+
+.captcha-img {
+  width: 220rpx;
+  height: 84rpx;
+  border-radius: 16rpx;
+  background: #f6f7f9;
+  border: 1rpx solid #eef0f3;
+}
+
+.btn {
+  margin-top: 34rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  border-radius: 18rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.btn.primary {
+  background: #07c160;
+  color: #fff;
+}
+
+.btn.primary[disabled] {
+  opacity: 0.6;
+}
+
+/* 让按钮更像微信原生：去掉默认边框高亮 */
+button::after {
+  border: none;
+}
+
+/* placeholder 更柔和一点 */
+.input::placeholder {
+  color: #b1b6bf;
+}
+
+.tips {
+  margin-top: 18rpx;
+  color: #9aa0a6;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
