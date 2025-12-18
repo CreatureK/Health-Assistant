@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.med.PlanRepeatDaysMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.med.PlanRepeatDays">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="day_of_week" property="dayOfWeek"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <!-- 根据计划ID查询重复天数列表 -->
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT id, plan_id, day_of_week, created_at
+        FROM plan_repeat_days
+        WHERE plan_id = #{planId}
+        ORDER BY day_of_week ASC
+    </select>
+
+    <!-- 批量插入重复天数 -->
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO plan_repeat_days (plan_id, day_of_week, created_at)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.planId}, #{item.dayOfWeek}, NOW())
+        </foreach>
+    </insert>
+
+    <!-- 根据计划ID删除重复天数 -->
+    <delete id="deleteByPlanId">
+        DELETE FROM plan_repeat_days WHERE plan_id = #{planId}
+    </delete>
+
+</mapper>
+

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.med.PlanTimesMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.med.PlanTimes">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="time" property="time"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <!-- 根据计划ID查询时间点列表 -->
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT id, plan_id, time, sort_order, created_at
+        FROM plan_times
+        WHERE plan_id = #{planId}
+        ORDER BY sort_order ASC, time ASC
+    </select>
+
+    <!-- 批量插入时间点 -->
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO plan_times (plan_id, time, sort_order, created_at)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.planId}, #{item.time}, #{item.sortOrder}, NOW())
+        </foreach>
+    </insert>
+
+    <!-- 根据计划ID删除时间点 -->
+    <delete id="deleteByPlanId">
+        DELETE FROM plan_times WHERE plan_id = #{planId}
+    </delete>
+
+</mapper>
+

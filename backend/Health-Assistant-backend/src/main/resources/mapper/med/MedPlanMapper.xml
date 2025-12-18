@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.med.MedPlanMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.med.MedPlan">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="name" property="name"/>
+        <result column="dosage" property="dosage"/>
+        <result column="start_date" property="startDate"/>
+        <result column="end_date" property="endDate"/>
+        <result column="repeat_type" property="repeatType"/>
+        <result column="remind_enabled" property="remindEnabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted_at" property="deletedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, name, dosage, start_date, end_date, repeat_type, remind_enabled, created_at, updated_at, deleted_at
+    </sql>
+
+    <!-- 根据ID查询计划 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_plan
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <!-- 根据用户ID查询计划列表 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_plan
+        WHERE user_id = #{userId} AND deleted_at IS NULL
+        <if test="status != null and status == 'active'">
+            AND end_date >= CURDATE()
+        </if>
+        <if test="status != null and status == 'expired'">
+            AND end_date &lt; CURDATE()
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 插入计划 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO med_plan (user_id, name, dosage, start_date, end_date, repeat_type, remind_enabled, created_at, updated_at)
+        VALUES (#{userId}, #{name}, #{dosage}, #{startDate}, #{endDate}, #{repeatType}, #{remindEnabled}, NOW(), NOW())
+    </insert>
+
+    <!-- 更新计划 -->
+    <update id="update">
+        UPDATE med_plan
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="dosage != null">dosage = #{dosage},</if>
+            <if test="startDate != null">start_date = #{startDate},</if>
+            <if test="endDate != null">end_date = #{endDate},</if>
+            <if test="repeatType != null">repeat_type = #{repeatType},</if>
+            <if test="remindEnabled != null">remind_enabled = #{remindEnabled},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <!-- 软删除计划 -->
+    <update id="deleteById">
+        UPDATE med_plan
+        SET deleted_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <!-- 更新提醒开关 -->
+    <update id="updateRemindEnabled">
+        UPDATE med_plan
+        SET remind_enabled = #{remindEnabled}, updated_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+</mapper>
+

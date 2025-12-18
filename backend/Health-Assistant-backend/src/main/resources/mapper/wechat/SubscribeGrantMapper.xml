@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.wechat.SubscribeGrantMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.wechat.SubscribeGrant">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="granted" property="granted"/>
+        <result column="template_ids" property="templateIds" typeHandler="org.health.common.JsonTypeHandler"/>
+        <result column="detail" property="detail" typeHandler="org.health.common.JsonTypeHandler"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, granted, template_ids, detail, created_at, updated_at
+    </sql>
+
+    <!-- 根据用户ID查询授权信息 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM subscribe_grant
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <!-- 插入授权信息 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO subscribe_grant (user_id, granted, template_ids, detail, created_at, updated_at)
+        VALUES (#{userId}, #{granted}, #{templateIds, typeHandler=org.health.common.JsonTypeHandler},
+                #{detail, typeHandler=org.health.common.JsonTypeHandler}, NOW(), NOW())
+    </insert>
+
+    <!-- 更新授权信息 -->
+    <update id="update">
+        UPDATE subscribe_grant
+        <set>
+            <if test="granted != null">granted = #{granted},</if>
+            <if test="templateIds != null">template_ids = #{templateIds, typeHandler=org.health.common.JsonTypeHandler},</if>
+            <if test="detail != null">detail = #{detail, typeHandler=org.health.common.JsonTypeHandler},</if>
+            updated_at = NOW()
+        </set>
+        WHERE user_id = #{userId}
+    </update>
+
+</mapper>
+

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.med.MedRecordMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.med.MedRecord">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="plan_name" property="planName"/>
+        <result column="dosage" property="dosage"/>
+        <result column="date" property="date"/>
+        <result column="time" property="time"/>
+        <result column="status" property="status"/>
+        <result column="action_at" property="actionAt"/>
+        <result column="note" property="note"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        r.id, r.plan_id, p.name as plan_name, p.dosage, r.date, r.time, r.status, r.action_at, r.note, r.created_at, r.updated_at
+    </sql>
+
+    <!-- 根据ID查询记录 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_record r
+        LEFT JOIN med_plan p ON r.plan_id = p.id
+        WHERE r.id = #{id}
+    </select>
+
+    <!-- 根据计划ID、日期、时间查询记录 -->
+    <select id="selectByPlanDateTime" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_record r
+        LEFT JOIN med_plan p ON r.plan_id = p.id
+        WHERE r.plan_id = #{planId} AND r.date = #{date} AND r.time = #{time}
+        LIMIT 1
+    </select>
+
+    <!-- 根据日期查询记录列表 -->
+    <select id="selectByDate" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_record r
+        LEFT JOIN med_plan p ON r.plan_id = p.id
+        WHERE p.user_id = #{userId} AND r.date = #{date} AND p.deleted_at IS NULL
+        ORDER BY r.time ASC
+    </select>
+
+    <!-- 查询记录列表（支持多条件过滤） -->
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM med_record r
+        LEFT JOIN med_plan p ON r.plan_id = p.id
+        WHERE p.user_id = #{userId} AND p.deleted_at IS NULL
+        <if test="planId != null">
+            AND r.plan_id = #{planId}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        <if test="startDate != null">
+            AND r.date >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND r.date &lt;= #{endDate}
+        </if>
+        ORDER BY r.date DESC, r.time ASC
+        <if test="limit != null and limit > 0">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 统计记录总数 -->
+    <select id="countList" resultType="int">
+        SELECT COUNT(*)
+        FROM med_record r
+        LEFT JOIN med_plan p ON r.plan_id = p.id
+        WHERE p.user_id = #{userId} AND p.deleted_at IS NULL
+        <if test="planId != null">
+            AND r.plan_id = #{planId}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        <if test="startDate != null">
+            AND r.date >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND r.date &lt;= #{endDate}
+        </if>
+    </select>
+
+    <!-- 插入记录 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO med_record (plan_id, date, time, status, action_at, note, created_at, updated_at)
+        VALUES (#{planId}, #{date}, #{time}, #{status}, #{actionAt}, #{note}, NOW(), NOW())
+    </insert>
+
+    <!-- 批量插入记录 -->
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO med_record (plan_id, date, time, status, action_at, note, created_at, updated_at)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.planId}, #{item.date}, #{item.time}, #{item.status}, #{item.actionAt}, #{item.note}, NOW(), NOW())
+        </foreach>
+    </insert>
+
+    <!-- 更新记录状态 -->
+    <update id="updateStatus">
+        UPDATE med_record
+        SET status = #{status}, action_at = NOW(), updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新记录（补记/更正） -->
+    <update id="update">
+        UPDATE med_record
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="actionAt != null">action_at = #{actionAt},</if>
+            <if test="note != null">note = #{note},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据计划ID和日期范围删除记录 -->
+    <delete id="deleteByPlanIdAndDate">
+        DELETE FROM med_record
+        WHERE plan_id = #{planId} AND date >= #{startDate}
+    </delete>
+
+</mapper>
+

@@ -20,24 +20,56 @@ src/main/java/org/health/
 ├── config/                            # 配置类
 │   ├── GlobalExceptionHandler.java    # 全局异常处理
 │   ├── MyBatisConfig.java             # MyBatis配置
+│   ├── SwaggerConfig.java             # Swagger配置
 │   └── WebConfig.java                 # Web配置（拦截器、跨域）
 ├── common/                            # 通用组件
 │   ├── Result.java                    # 统一响应格式
 │   ├── ResultCode.java                # 错误码枚举
 │   ├── JwtUtil.java                   # JWT工具类
-│   └── UserContext.java               # 用户上下文
+│   ├── UserContext.java               # 用户上下文
+│   └── JsonTypeHandler.java           # JSON类型处理器
 ├── interceptor/                       # 拦截器
 │   └── AuthInterceptor.java           # JWT认证拦截器
 ├── controller/                        # 控制器层
-│   └── auth/
-│       └── AuthController.java       # 认证接口
+│   ├── auth/
+│   │   └── AuthController.java       # 认证接口
+│   ├── med/
+│   │   ├── MedPlanController.java    # 用药计划接口
+│   │   ├── MedTodayController.java   # 今日用药接口
+│   │   ├── MedRecordController.java  # 用药记录接口
+│   │   └── DrugController.java       # 药品库接口
+│   └── wechat/
+│       └── SubscribeController.java   # 订阅消息接口
 ├── service/                           # 服务层
-│   └── auth/
-│       └── AuthService.java          # 认证服务
+│   ├── auth/
+│   │   └── AuthService.java          # 认证服务
+│   ├── med/
+│   │   ├── MedPlanService.java       # 用药计划服务
+│   │   ├── MedTodayService.java      # 今日用药服务
+│   │   ├── MedRecordService.java     # 用药记录服务
+│   │   └── DrugService.java          # 药品库服务
+│   └── wechat/
+│       └── SubscribeService.java      # 订阅消息服务
 ├── mapper/                            # 数据访问层
-│   └── UserMapper.java               # 用户Mapper
+│   ├── UserMapper.java               # 用户Mapper
+│   ├── med/
+│   │   ├── MedPlanMapper.java        # 用药计划Mapper
+│   │   ├── PlanTimesMapper.java      # 计划时间点Mapper
+│   │   ├── PlanRepeatDaysMapper.java # 计划重复天数Mapper
+│   │   ├── MedRecordMapper.java      # 用药记录Mapper
+│   │   └── DrugCatalogMapper.java    # 药品库Mapper
+│   └── wechat/
+│       └── SubscribeGrantMapper.java  # 订阅授权Mapper
 └── entity/                            # 实体类
-    └── User.java                     # 用户实体
+    ├── User.java                     # 用户实体
+    ├── med/
+    │   ├── MedPlan.java              # 用药计划实体
+    │   ├── PlanTimes.java            # 计划时间点实体
+    │   ├── PlanRepeatDays.java       # 计划重复天数实体
+    │   ├── MedRecord.java            # 用药记录实体
+    │   └── DrugCatalog.java         # 药品库实体
+    └── wechat/
+        └── SubscribeGrant.java        # 订阅授权实体
 ```
 
 ## 快速开始
@@ -83,9 +115,30 @@ java -jar target/Health-Assistant-backend-1.0-SNAPSHOT.jar
 ### 4. 访问接口
 
 - 基础路径: `http://localhost:8080/api/v1`
-- 登录接口: `POST /auth/login`
-- 注册接口: `POST /auth/register`
-- 验证码接口: `GET /auth/captcha`
+- **认证接口**:
+  - `GET /auth/captcha` - 获取验证码
+  - `POST /auth/login` - 登录
+  - `POST /auth/register` - 注册
+- **用药计划接口**:
+  - `GET /med/plans` - 获取计划列表
+  - `POST /med/plans` - 创建计划
+  - `GET /med/plans/:id` - 获取计划详情
+  - `PUT /med/plans/:id` - 更新计划
+  - `DELETE /med/plans/:id` - 删除计划
+  - `POST /med/plans/:id/remind` - 更新提醒开关
+- **今日用药接口**:
+  - `GET /med/today` - 获取当天点位
+  - `POST /med/today/ensure` - 确保生成点位
+- **用药记录接口**:
+  - `GET /med/records` - 查询记录列表
+  - `POST /med/records/:recordId/mark` - 标记已服用/未服
+  - `POST /med/records/:recordId/adjust` - 补记/更正
+- **药品库接口**:
+  - `GET /med/drugs` - 药品搜索列表
+  - `GET /med/drugs/:id` - 药品详情
+- **订阅消息接口**:
+  - `GET /wechat/subscribe/config` - 获取订阅模板配置
+  - `POST /wechat/subscribe/report` - 上报授权结果
 
 ## Swagger API文档
 
@@ -121,7 +174,13 @@ java -jar target/Health-Assistant-backend-1.0-SNAPSHOT.jar
 
 4. **接口分组**：
    - 接口按Controller分组显示
-   - 当前有"认证管理"模块
+   - 当前包含以下模块：
+     - 认证管理
+     - 用药计划管理
+     - 今日用药管理
+     - 用药记录管理
+     - 药品库管理
+     - 微信订阅消息管理
 
 ## 接口规范
 
@@ -168,6 +227,8 @@ Authorization: Bearer <token>
 - `server.servlet.context-path`: 上下文路径（/api/v1）
 - `jwt.secret`: JWT密钥（生产环境请修改）
 - `jwt.expiration`: Token过期时间（毫秒）
+- `mybatis.mapper-locations`: MyBatis XML映射文件位置（支持子目录）
+- `wechat.subscribe.template-ids`: 微信订阅消息模板ID列表（逗号分隔）
 
 ### application-dev.yml
 
@@ -192,35 +253,93 @@ String encodedPassword = encoder.encode(password);
 - 验证码存储（Redis推荐）
 - 验证码校验
 
+## 已实现模块
+
+### 第一阶段：核心功能模块（MVP）
+
+1. **认证模块** (`/auth/*`) ✅
+   - 用户登录、注册
+   - 验证码获取（占位实现）
+
+2. **用药计划模块** (`/med/plans/*`) ✅
+   - 创建、查询、更新、删除用药计划
+   - 支持每日/每周重复类型
+   - 提醒开关管理
+   - 更新计划时自动重建未来点位记录
+
+3. **今日用药模块** (`/med/today/*`) ✅
+   - 获取当天用药点位
+   - 自动生成点位记录（按计划规则）
+
+4. **用药记录模块** (`/med/records/*`) ✅
+   - 查询用药记录列表（支持多条件过滤）
+   - 标记已服用/未服
+   - 补记/更正功能
+
+5. **药品库模块** (`/med/drugs/*`) ✅
+   - 药品搜索（支持关键词和全文检索）
+   - 药品详情查询
+
+6. **微信订阅消息模块** (`/wechat/subscribe/*`) ✅
+   - 获取订阅模板配置
+   - 上报授权结果
+
 ## 后续开发
 
-根据接口文档，需要实现以下模块：
+### 第二阶段：其他功能模块
 
-1. **用药管理模块** (`/med/*`)
-   - 用药计划管理
-   - 今日用药打卡
-   - 用药记录查询
+1. **健康日记模块** (`/health/diary/*`)
+   - 创建/更新健康日记
+   - 查询日记列表
+   - 趋势数据统计
 
-2. **订阅消息模块** (`/wechat/subscribe/*`)
-   - 订阅模板配置
-   - 授权结果上报
+2. **AI对话模块** (`/ai/*`)
+   - 发送消息
+   - 会话管理
+   - 消息历史
 
-3. **药品库模块** (`/med/drugs/*`)
-   - 药品搜索
-   - 药品详情
+3. **紧急联系人模块** (`/profile/emergency-contacts/*`)
+   - 获取/更新紧急联系人
 
-4. **第二阶段模块**
-   - 健康日记
-   - AI对话
-   - 紧急联系人
-   - 健康文章
+4. **健康文章模块** (`/articles/*`)
+   - 文章列表
+   - 文章详情
+
+5. **家属绑定模块** (`/family/*`)
+   - 生成家庭码
    - 家属绑定
+   - 家属侧聚合数据
+
+## 技术实现说明
+
+### JSON字段处理
+
+项目使用自定义的 `JsonTypeHandler` 处理数据库中的JSON字段（如药品库的tags、commonNames等）。该处理器基于Jackson实现，支持List和Map类型的自动转换。
+
+### 点位记录生成逻辑
+
+- 创建计划时不会自动生成点位记录
+- 调用 `/med/today` 或 `/med/today/ensure` 时会自动生成当天的点位记录
+- 更新计划时，会删除 `today+1` 之后的所有点位记录，然后重新生成
+- 点位记录的唯一性由 `plan_id + date + time` 保证
+
+### 计划重复类型
+
+- **daily**: 每日重复，无需设置 `repeatDays`
+- **weekly**: 每周特定几天重复，需要设置 `repeatDays`（0=周日，1=周一，...，6=周六）
+
+### 软删除机制
+
+用药计划使用软删除（`deleted_at` 字段），删除后数据仍保留在数据库中，便于数据恢复和审计。
 
 ## 注意事项
 
 1. 生产环境请修改JWT密钥
-2. 密码加密建议使用BCrypt
-3. 验证码功能需要完整实现
+2. 密码加密建议使用BCrypt（当前使用MD5，仅用于开发）
+3. 验证码功能需要完整实现（当前返回占位数据）
 4. 数据库连接池配置可根据实际情况调整
 5. 日志级别生产环境建议调整为INFO
+6. JSON字段需要MySQL 5.7+支持
+7. 全文检索功能需要MySQL全文索引支持（FULLTEXT）
+8. 微信订阅消息的定时发送功能需要单独实现（使用Spring的@Scheduled注解）
 

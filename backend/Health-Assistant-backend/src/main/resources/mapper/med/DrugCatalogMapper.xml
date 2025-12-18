@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.med.DrugCatalogMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.med.DrugCatalog">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="common_names" property="commonNames" typeHandler="org.health.common.JsonTypeHandler"/>
+        <result column="tags" property="tags" typeHandler="org.health.common.JsonTypeHandler"/>
+        <result column="intro" property="intro"/>
+        <result column="usage" property="usage"/>
+        <result column="warnings" property="warnings"/>
+        <result column="disclaimer" property="disclaimer"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, name, common_names, tags, intro, usage, warnings, disclaimer, created_at, updated_at
+    </sql>
+
+    <!-- 根据ID查询药品 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM drug_catalog
+        WHERE id = #{id}
+    </select>
+
+    <!-- 搜索药品列表 -->
+    <select id="searchDrugs" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM drug_catalog
+        <if test="keyword != null and keyword != ''">
+            WHERE name LIKE CONCAT('%', #{keyword}, '%')
+            OR MATCH(name, intro) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        </if>
+        ORDER BY id ASC
+        <if test="limit != null and limit > 0">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 统计药品总数 -->
+    <select id="countDrugs" resultType="int">
+        SELECT COUNT(*)
+        FROM drug_catalog
+        <if test="keyword != null and keyword != ''">
+            WHERE name LIKE CONCAT('%', #{keyword}, '%')
+            OR MATCH(name, intro) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        </if>
+    </select>
+
+</mapper>
+
