@@ -2,7 +2,10 @@
   <view class="page">
     <view class="card">
       <view class="row head">
-        <text class="title">今日用药</text>
+        <view class="head-left">
+          <text class="title">今日用药</text>
+          <text v-if="isMock" class="badge">示例数据</text>
+        </view>
         <picker mode="date" :value="date" @change="onPickDate">
           <view class="pick">{{ date }}</view>
         </picker>
@@ -37,9 +40,19 @@ function todayStr() {
   return `${y}-${m}-${dd}`;
 }
 
+
+function mockRecords(date) {
+  // 用于前端自测布局：后端无数据时展示
+  return [
+    { id: `${date}-1`, planName: "阿司匹林", time: "08:00", dosage: "1片", status: "todo" },
+    { id: `${date}-2`, planName: "维生素D", time: "12:30", dosage: "1粒", status: "taken" },
+    { id: `${date}-3`, planName: "二甲双胍", time: "19:00", dosage: "0.5片", status: "missed" }
+  ];
+}
+
 export default {
   data() {
-    return { date: todayStr(), loading: false, records: [] };
+    return { date: todayStr(), loading: false, records: [], isMock: false };
   },
   onShow() {
     this.fetchToday();
@@ -57,7 +70,13 @@ export default {
           method: "GET",
           data: { date: this.date }
         });
-        this.records = Array.isArray(data) ? data : (data?.list || []);
+        const list = Array.isArray(data) ? data : (data?.list || []);
+        this.isMock = !list.length;
+        this.records = list.length ? list : mockRecords(this.date);
+      } catch (e) {
+        // 网络/后端异常时也用示例数据，方便调试页面
+        this.isMock = true;
+        this.records = mockRecords(this.date);
       } finally {
         this.loading = false;
       }

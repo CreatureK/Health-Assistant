@@ -117,7 +117,8 @@ export default {
         uni.setStorageSync("user", data.user || null);
 
         uni.showToast({ title: "登录成功", icon: "success" });
-        uni.reLaunch({ url: "/pages/med/plan-list" });
+        uni.reLaunch({ url: "/pages/hub/entry" });
+
       } catch (e) {
         // 登录失败刷新验证码
         await this.fetchCaptcha();
