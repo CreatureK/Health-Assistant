@@ -1,5 +1,6 @@
 package org.health.common;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.io.Serializable;
 
@@ -10,17 +11,20 @@ import java.io.Serializable;
  * @param <T> 数据类型
  */
 @Data
+@Schema(description = "统一响应格式")
 public class Result<T> implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
      * 响应码：200-成功，非200-失败
      */
+    @Schema(description = "响应码：200-成功，非200-失败", example = "200")
     private Integer code;
 
     /**
      * 响应消息
      */
+    @Schema(description = "响应消息", example = "ok")
     private String msg;
 
     /**
