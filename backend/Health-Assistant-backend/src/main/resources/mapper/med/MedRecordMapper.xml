@@ -58,17 +58,22 @@
         FROM med_record r
         LEFT JOIN med_plan p ON r.plan_id = p.id
         WHERE p.user_id = #{userId} AND p.deleted_at IS NULL
-        <if test="planId != null">
-            AND r.plan_id = #{planId}
+        <if test="id != null">
+            AND r.id = #{id}
         </if>
-        <if test="status != null and status != ''">
-            AND r.status = #{status}
-        </if>
-        <if test="startDate != null">
-            AND r.date >= #{startDate}
-        </if>
-        <if test="endDate != null">
-            AND r.date &lt;= #{endDate}
+        <if test="id == null">
+            <if test="planId != null">
+                AND r.plan_id = #{planId}
+            </if>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="startDate != null">
+                AND r.date >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND r.date &lt;= #{endDate}
+            </if>
         </if>
         ORDER BY r.date DESC, r.time ASC
         <if test="limit != null and limit > 0">
@@ -82,17 +87,22 @@
         FROM med_record r
         LEFT JOIN med_plan p ON r.plan_id = p.id
         WHERE p.user_id = #{userId} AND p.deleted_at IS NULL
-        <if test="planId != null">
-            AND r.plan_id = #{planId}
+        <if test="id != null">
+            AND r.id = #{id}
         </if>
-        <if test="status != null and status != ''">
-            AND r.status = #{status}
-        </if>
-        <if test="startDate != null">
-            AND r.date >= #{startDate}
-        </if>
-        <if test="endDate != null">
-            AND r.date &lt;= #{endDate}
+        <if test="id == null">
+            <if test="planId != null">
+                AND r.plan_id = #{planId}
+            </if>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="startDate != null">
+                AND r.date >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND r.date &lt;= #{endDate}
+            </if>
         </if>
     </select>
 
@@ -114,7 +124,16 @@
     <!-- 更新记录状态 -->
     <update id="updateStatus">
         UPDATE med_record
-        SET status = #{status}, action_at = NOW(), updated_at = NOW()
+        SET status = #{status},
+        <choose>
+            <when test="status != null and status.equals('todo')">
+                action_at = NULL,
+            </when>
+            <otherwise>
+                action_at = NOW(),
+            </otherwise>
+        </choose>
+        updated_at = NOW()
         WHERE id = #{id}
     </update>
 
