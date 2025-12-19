@@ -255,7 +255,11 @@ public class MedPlanService {
             throw new RuntimeException(ResultCode.NOT_FOUND.getMsg());
         }
 
-        // 软删除
+        // 级联删除未来的todo记录（只删除状态为todo且日期大于今天的记录）
+        LocalDate today = LocalDate.now();
+        medRecordMapper.deleteFutureTodoRecordsByPlanId(id, today);
+
+        // 软删除计划
         medPlanMapper.deleteById(id);
     }
 

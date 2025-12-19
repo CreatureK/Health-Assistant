@@ -119,5 +119,15 @@ public interface MedRecordMapper {
      * @return 影响行数
      */
     int deleteByPlanIdAndDate(@Param("planId") Long planId, @Param("startDate") LocalDate startDate);
+
+    /**
+     * 删除计划未来的todo记录
+     * 只删除状态为'todo'且日期大于指定日期的记录
+     *
+     * @param planId 计划ID
+     * @param startDate 开始日期（不包含，只删除大于此日期的记录）
+     * @return 影响行数
+     */
+    int deleteFutureTodoRecordsByPlanId(@Param("planId") Long planId, @Param("startDate") LocalDate startDate);
 }
 
