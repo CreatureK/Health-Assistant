@@ -15,8 +15,9 @@
       🤖 AI 健康对话助手
     </view>
 
-    <view class="card" @click="go('/pages/health/diary')">
-      📝 健康日记（手动记录）
+    <!-- 替换：原“健康日记”入口删除，改为“药品库” -->
+    <view class="card" @click="go('/pages/med/drug-list')">
+      🧾 药品库
     </view>
   </view>
 </template>
@@ -25,11 +26,6 @@
 export default {
   methods: {
     go(url) {
-      // ✅ plan-list 是启动页/主页面时，navigateTo 可能不生效，用 reLaunch 最稳
-      if (url === "/pages/med/plan-list") {
-        uni.reLaunch({ url });
-        return;
-      }
       uni.navigateTo({ url });
     }
   }
@@ -38,12 +34,12 @@ export default {
 
 <style scoped>
 .container {
-  padding: 40rpx;
+  padding: 40rpx 32rpx;
 }
 .title {
-  font-size: 40rpx;
-  font-weight: bold;
-  margin-bottom: 20rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
 }
 .subtitle {
   color: #666;
