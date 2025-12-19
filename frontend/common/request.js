@@ -1,4 +1,5 @@
-export const BASE_URL = "http://192.168.1.23:8080"; // ✅ 只改这里
+export const BASE_URL = "http://10.20.144.71:8080";
+// ✅ 只改这里
 
 function getToken() {
   return uni.getStorageSync("token") || "";
@@ -89,3 +90,4 @@ export function request({ url, method = "GET", data, header }) {
 }
 
 export { API } from "./api";
+// update 2025/12/19 ���� 19:49:01.73
