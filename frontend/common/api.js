@@ -17,6 +17,10 @@
  * POST   /api/v1/med/records/:recordId/adjust  body: {status, actionAt?, note?}
  * GET    /api/v1/med/records                   query: {planId?, status?, startDate?, endDate?, id?}
  *
+ * ------------------ 药品库（新增） ---------------------------
+ * GET    /api/v1/med/drugs                     query: {keyword?, page?, size?}
+ * GET    /api/v1/med/drugs/:id
+ *
  * GET    /api/v1/wechat/subscribe/config       -> {templateIds:[]}
  * POST   /api/v1/wechat/subscribe/report       body: {granted:boolean, detail?:object}
  * ============================================================
@@ -40,7 +44,11 @@ export const API = {
   medRecordMark: (recordId) => `/api/v1/med/records/${recordId}/mark`, // POST
   medRecordAdjust: (recordId) => `/api/v1/med/records/${recordId}/adjust`, // POST
 
+  // drugs
+  medDrugs: "/api/v1/med/drugs", // GET
+  medDrugDetail: (id) => `/api/v1/med/drugs/${id}`, // GET
+
   // wechat subscribe
   wechatSubscribeConfig: "/api/v1/wechat/subscribe/config", // GET
-  wechatSubscribeReport: "/api/v1/wechat/subscribe/report"  // POST
+  wechatSubscribeReport: "/api/v1/wechat/subscribe/report" // POST
 };
