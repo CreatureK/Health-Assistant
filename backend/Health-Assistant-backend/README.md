@@ -188,7 +188,7 @@ java -jar target/Health-Assistant-backend-1.0-SNAPSHOT.jar
 
 ```json
 {
-  "code": 0,
+  "code": 200,
   "msg": "ok",
   "data": {}
 }
@@ -198,7 +198,7 @@ java -jar target/Health-Assistant-backend-1.0-SNAPSHOT.jar
 
 | 错误码 | 含义 |
 |--------|------|
-| 0 | 成功 |
+| 200 | 成功 |
 | 400 | 参数错误 |
 | 401 | 未登录/Token失效 |
 | 403 | 无权限 |

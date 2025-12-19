@@ -5,7 +5,7 @@ import java.io.Serializable;
 
 /**
  * 统一响应格式
- * 符合接口文档规范：{code: 0, msg: "ok", data: {...}}
+ * 符合接口文档规范：{code: 200, msg: "ok", data: {...}}
  *
  * @param <T> 数据类型
  */
@@ -14,7 +14,7 @@ public class Result<T> implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 响应码：0-成功，非0-失败
+     * 响应码：200-成功，非200-失败
      */
     private Integer code;
 

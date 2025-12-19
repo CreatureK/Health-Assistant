@@ -13,7 +13,7 @@ public enum ResultCode {
     /**
      * 成功
      */
-    SUCCESS(0, "ok"),
+    SUCCESS(200, "成功"),
 
     /**
      * 参数错误
@@ -48,4 +48,3 @@ public enum ResultCode {
     private final Integer code;
     private final String msg;
 }
-
