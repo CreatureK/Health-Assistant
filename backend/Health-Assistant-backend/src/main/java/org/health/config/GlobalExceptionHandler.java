@@ -2,6 +2,7 @@ package org.health.config;
 
 import org.health.common.Result;
 import org.health.common.ResultCode;
+import org.health.exception.BusinessException;
 import org.health.exception.CaptchaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,16 @@ public class GlobalExceptionHandler {
     public Result<?> handleCaptchaException(CaptchaException e) {
         logger.warn("验证码异常: {}", e.getMessage());
         return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+    }
+
+    /**
+     * 业务异常
+     * 注意：必须在RuntimeException之前处理，因为BusinessException继承自RuntimeException
+     */
+    @ExceptionHandler(BusinessException.class)
+    public Result<?> handleBusinessException(BusinessException e) {
+        logger.warn("业务异常: {}", e.getMessage());
+        return Result.error(e.getResultCode(), e.getMessage());
     }
 
     /**

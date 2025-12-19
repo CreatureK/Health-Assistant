@@ -2,7 +2,9 @@ package org.health.service.auth;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.health.common.JwtUtil;
+import org.health.common.ResultCode;
 import org.health.entity.User;
+import org.health.exception.BusinessException;
 import org.health.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,13 +41,13 @@ public class AuthService {
         // 查询用户
         User user = userMapper.selectByUsername(username);
         if (user == null) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
         }
 
         // 验证密码（这里简化处理，实际应该使用BCrypt等加密算法）
         String encryptedPassword = DigestUtils.md5DigestAsHex(password.getBytes());
         if (!encryptedPassword.equals(user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
         }
 
         // 生成Token
@@ -79,7 +81,7 @@ public class AuthService {
         // 检查用户名是否已存在
         User existingUser = userMapper.selectByUsername(username);
         if (existingUser != null) {
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException(ResultCode.CONFLICT, "用户名已存在");
         }
 
         // 创建新用户
@@ -88,6 +90,8 @@ public class AuthService {
         // 密码加密（这里简化处理，实际应该使用BCrypt等加密算法）
         user.setPassword(DigestUtils.md5DigestAsHex(password.getBytes()));
         user.setRole("elder"); // 默认角色为老人
+        // 设置默认nickname（使用username）
+        user.setNickname(username);
 
         userMapper.insert(user);
         return user.getId();

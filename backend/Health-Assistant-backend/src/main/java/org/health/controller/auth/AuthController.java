@@ -13,6 +13,7 @@ import org.health.service.auth.CaptchaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -42,7 +43,7 @@ public class AuthController {
     })
     @PostMapping("/login")
     public Result<AuthService.LoginResult> login(
-            @Parameter(description = "登录请求参数", required = true) @RequestBody LoginRequest request) {
+            @Parameter(description = "登录请求参数", required = true) @Valid @RequestBody LoginRequest request) {
         AuthService.LoginResult result = authService.login(
                 request.getUsername(),
                 request.getPassword(),
@@ -63,7 +64,7 @@ public class AuthController {
     })
     @PostMapping("/register")
     public Result<RegisterResponse> register(
-            @Parameter(description = "注册请求参数", required = true) @RequestBody RegisterRequest request) {
+            @Parameter(description = "注册请求参数", required = true) @Valid @RequestBody RegisterRequest request) {
         Long userId = authService.register(
                 request.getUsername(),
                 request.getPassword(),
