@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.ai.AiMessageMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.ai.AiMessage">
+        <id column="id" property="id"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="role" property="role"/>
+        <result column="content" property="content"/>
+        <result column="input_type" property="inputType"/>
+        <result column="safety_hint" property="safetyHint"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, session_id, role, content, input_type, safety_hint, created_at
+    </sql>
+
+    <!-- 插入消息 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_message (session_id, role, content, input_type, safety_hint, created_at)
+        VALUES (#{sessionId}, #{role}, #{content}, #{inputType}, #{safetyHint}, NOW())
+    </insert>
+
+    <!-- 根据会话ID查询消息列表 -->
+    <select id="selectBySessionId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM ai_message
+        WHERE session_id = #{sessionId}
+        ORDER BY created_at ASC
+    </select>
+
+    <!-- 根据会话ID查询最近N条消息 -->
+    <select id="selectRecentBySessionId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM ai_message
+        WHERE session_id = #{sessionId}
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
+
