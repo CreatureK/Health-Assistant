@@ -1,29 +1,31 @@
 package org.health.service.auth;
 
 import org.health.exception.CaptchaException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 验证码服务
+ * 使用内存存储验证码（适用于单机部署）
  */
 @Service
 public class CaptchaService {
-
-    @Autowired
-    private StringRedisTemplate redisTemplate;
 
     @Value("${captcha.width:120}")
     private int width;
@@ -40,8 +42,61 @@ public class CaptchaService {
     @Value("${captcha.chars:0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ}")
     private String chars;
 
-    private static final String REDIS_KEY_PREFIX = "captcha:";
+    // 内存存储验证码：key为captchaId，value为验证码信息和过期时间
+    private final Map<String, CaptchaInfo> captchaStore = new ConcurrentHashMap<>();
+
+    // 定时清理过期验证码的线程池
+    private ScheduledExecutorService cleanupExecutor;
+
     private static final Random random = new Random();
+
+    /**
+     * 验证码信息
+     */
+    private static class CaptchaInfo {
+        String code;
+        long expireTime;
+
+        CaptchaInfo(String code, long expireTime) {
+            this.code = code;
+            this.expireTime = expireTime;
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() > expireTime;
+        }
+    }
+
+    /**
+     * 初始化：启动定时清理任务
+     */
+    @PostConstruct
+    public void init() {
+        cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "captcha-cleanup");
+            t.setDaemon(true);
+            return t;
+        });
+        // 每120秒清理一次过期验证码
+        cleanupExecutor.scheduleWithFixedDelay(this::cleanupExpiredCaptchas, 120, 120, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 销毁：关闭清理线程池
+     */
+    @PreDestroy
+    public void destroy() {
+        if (cleanupExecutor != null && !cleanupExecutor.isShutdown()) {
+            cleanupExecutor.shutdown();
+        }
+    }
+
+    /**
+     * 清理过期的验证码
+     */
+    private void cleanupExpiredCaptchas() {
+        captchaStore.entrySet().removeIf(entry -> entry.getValue().isExpired());
+    }
 
     /**
      * 生成验证码
@@ -59,9 +114,9 @@ public class CaptchaService {
         BufferedImage image = createImage(captchaCode);
         String imageBase64 = imageToBase64(image);
 
-        // 存储到Redis，设置过期时间
-        String redisKey = REDIS_KEY_PREFIX + captchaId;
-        redisTemplate.opsForValue().set(redisKey, captchaCode.toUpperCase(), expireSeconds, TimeUnit.SECONDS);
+        // 存储到内存，设置过期时间
+        long expireTime = System.currentTimeMillis() + expireSeconds * 1000L;
+        captchaStore.put(captchaId, new CaptchaInfo(captchaCode.toUpperCase(), expireTime));
 
         // 返回结果
         CaptchaResult result = new CaptchaResult();
@@ -88,22 +143,25 @@ public class CaptchaService {
             throw new CaptchaException("验证码不能为空");
         }
 
-        String redisKey = REDIS_KEY_PREFIX + captchaId;
-        String storedCode = redisTemplate.opsForValue().get(redisKey);
+        CaptchaInfo captchaInfo = captchaStore.get(captchaId);
 
-        if (storedCode == null) {
+        if (captchaInfo == null || captchaInfo.isExpired()) {
+            // 如果过期，清理掉
+            if (captchaInfo != null) {
+                captchaStore.remove(captchaId);
+            }
             throw new CaptchaException("验证码已过期或不存在");
         }
 
         // 不区分大小写比较
-        if (!storedCode.equalsIgnoreCase(captchaCode.trim())) {
+        if (!captchaInfo.code.equalsIgnoreCase(captchaCode.trim())) {
             // 验证失败，删除验证码（防止暴力破解）
-            redisTemplate.delete(redisKey);
+            captchaStore.remove(captchaId);
             throw new CaptchaException("验证码错误");
         }
 
         // 验证成功，删除验证码（防止重复使用）
-        redisTemplate.delete(redisKey);
+        captchaStore.remove(captchaId);
     }
 
     /**
@@ -230,4 +288,3 @@ public class CaptchaService {
         }
     }
 }
-

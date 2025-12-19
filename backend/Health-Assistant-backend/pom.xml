@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.3.5</version>
         <relativePath/>
     </parent>
 
@@ -20,15 +20,15 @@
     <description>健康助手后端服务</description>
 
     <properties>
-        <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <java.version>23</java.version>
+        <maven.compiler.source>23</maven.compiler.source>
+        <maven.compiler.target>23</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mybatis-spring-boot.version>2.3.1</mybatis-spring-boot.version>
+        <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
         <mysql.version>8.0.33</mysql.version>
-        <jwt.version>0.11.5</jwt.version>
+        <jwt.version>0.12.5</jwt.version>
         <lombok.version>1.18.30</lombok.version>
-        <springdoc.version>1.7.0</springdoc.version>
+        <springdoc.version>2.6.0</springdoc.version>
     </properties>
 
     <dependencies>
@@ -88,14 +88,8 @@
         <!-- Swagger/OpenAPI -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
-        </dependency>
-
-        <!-- Spring Boot Redis -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <!-- Spring Boot Test -->
