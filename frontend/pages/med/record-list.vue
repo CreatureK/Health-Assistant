@@ -44,7 +44,8 @@
 </template>
 
 <script>
-import { request, API } from "@/common/request";
+import { request } from "@/common/request";
+import { API } from "@/common/api";
 
 function todayStr(offsetDays = 0) {
   const d = new Date();

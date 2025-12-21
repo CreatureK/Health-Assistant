@@ -45,7 +45,8 @@
 </template>
 
 <script>
-import { request, API } from "@/common/request";
+import { request } from "@/common/request";
+import { API } from "@/common/api";
 
 export default {
   data() {
