@@ -3,7 +3,7 @@
     <view class="card">
       <view class="title">
         用药记录
-        <text v-if="mocking" class="tag">示例数据</text>
+        <!-- <text v-if="mocking" class="tag">示例数据</text> -->
       </view>
 
       <view class="filters">
