@@ -4,7 +4,7 @@
       <view class="row head">
         <view class="head-left">
           <text class="title">今日用药</text>
-          <text v-if="isMock" class="badge">示例数据</text>
+          <!-- <text v-if="isMock" class="badge">示例数据</text> -->
         </view>
         <picker mode="date" :value="date" @change="onPickDate">
           <view class="pick">{{ date }}</view>

@@ -10,8 +10,8 @@
       <view class="line"></view>
 
       <view class="row">
-        <text class="label">微信提醒</text>
-        <switch :checked="!!plan.remindEnabled" @change="onToggleRemind"/>
+        <!-- <text class="label">微信提醒</text>
+        <switch :checked="!!plan.remindEnabled" @change="onToggleRemind"/> -->
       </view>
 
       <view class="row actions">
@@ -53,17 +53,17 @@ export default {
       const data = await request({ url: API.medPlanDetail(this.id), method: "GET" });
       this.plan = data || null;
     },
-    async onToggleRemind(e) {
-      const v = !!e.detail.value;
-      await request({
-        url: API.medPlanRemind(this.id),
-        method: "POST",
-        data: { remindEnabled: v }
-      });
-      this.plan.remindEnabled = v;
-      uni.showToast({ title: v ? "已开启提醒" : "已关闭提醒", icon: "none" });
-      if (v) uni.navigateTo({ url: "/pages/med/subscribe-guide" });
-    },
+    // async onToggleRemind(e) {
+    //   const v = !!e.detail.value;
+    //   await request({
+    //     url: API.medPlanRemind(this.id),
+    //     method: "POST",
+    //     data: { remindEnabled: v }
+    //   });
+    //   this.plan.remindEnabled = v;
+    //   uni.showToast({ title: v ? "已开启提醒" : "已关闭提醒", icon: "none" });
+    //   if (v) uni.navigateTo({ url: "/pages/med/subscribe-guide" });
+    // },
     goEdit() {
       uni.navigateTo({ url: `/pages/med/plan-edit?id=${this.id}` });
     },
