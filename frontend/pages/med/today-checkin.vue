@@ -30,7 +30,8 @@
 </template>
 
 <script>
-import { request, API } from "@/common/request";
+import { request } from "@/common/request";
+import { API } from "@/common/api";
 
 function todayStr() {
   const d = new Date();
