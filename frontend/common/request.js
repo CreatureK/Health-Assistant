@@ -103,3 +103,7 @@ export function request({ url, method = "GET", data, header }) {
     });
   });
 }
+<<<<<<< HEAD
+export {API} from "./api";
+=======
+>>>>>>> master

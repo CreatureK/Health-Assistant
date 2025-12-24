@@ -21,9 +21,9 @@
             </view>
           </view>
           <view class="right">
-            <text class="tag" :class="p.remindEnabled ? 'on' : 'off'">
+            <!-- <text class="tag" :class="p.remindEnabled ? 'on' : 'off'">
               {{ p.remindEnabled ? "已提醒" : "未提醒" }}
-            </text>
+            </text> -->
           </view>
         </view>
 
@@ -36,7 +36,7 @@
       <view class="row foot">
         <button class="mini" @click="goToday">今日用药</button>
         <button class="mini" @click="goRecords">用药记录</button>
-        <button class="mini" @click="goSubscribe">开启提醒</button>
+        <!-- <button class="mini" @click="goSubscribe">开启提醒</button> -->
       </view>
     </view>
   </view>
@@ -47,7 +47,7 @@ import { request } from "@/common/request";
 import { API } from "@/common/api";
 
 // ✅ 开关：后端没做好就 true；后端好了改成 false
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 // ✅ 初始假数据（你可以随便改）
 const DEFAULT_MOCK_PLANS = [

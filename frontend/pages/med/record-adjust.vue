@@ -97,12 +97,17 @@ export default {
 
       this.saving = true;
       try {
+		  // ✅ 1) 先拼 actionAt
+		  let actionAt = `${this.date}T${this.time}`;
+	  
+		  // ✅ 2) 补秒，变成 yyyy-MM-dd HH:mm:ss
+		  if (actionAt.length === 16) actionAt = actionAt + ":00";
         await request({
           url: API.medRecordAdjust(this.recordId),
           method: "POST",
           data: {
             status: this.form.status,
-            actionAt: `${this.date} ${this.time}`,
+            actionAt,
             note: this.form.note
           }
         });
