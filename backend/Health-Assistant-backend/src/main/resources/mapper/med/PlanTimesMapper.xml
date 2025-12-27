@@ -13,15 +13,15 @@
 
     <!-- 根据计划ID查询时间点列表 -->
     <select id="selectByPlanId" resultMap="BaseResultMap">
-        SELECT id, plan_id, time, sort_order, created_at
+        SELECT id, plan_id, `time`, sort_order, created_at
         FROM plan_times
         WHERE plan_id = #{planId}
-        ORDER BY sort_order ASC, time ASC
+        ORDER BY sort_order ASC, `time` ASC
     </select>
 
     <!-- 批量插入时间点 -->
     <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO plan_times (plan_id, time, sort_order, created_at)
+        INSERT INTO plan_times (plan_id, `time`, sort_order, created_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.planId}, #{item.time}, #{item.sortOrder}, NOW())
