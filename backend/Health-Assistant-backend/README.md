@@ -139,6 +139,9 @@ java -jar target/Health-Assistant-backend-1.0-SNAPSHOT.jar
 - **订阅消息接口**:
   - `GET /wechat/subscribe/config` - 获取订阅模板配置
   - `POST /wechat/subscribe/report` - 上报授权结果
+- **健康文章接口**:
+  - `GET /articles` - 文章列表（支持分类、关键词、分页）
+  - `GET /articles/:id` - 文章详情
 
 ## Swagger API文档
 
@@ -284,6 +287,11 @@ String encodedPassword = encoder.encode(password);
    - 获取订阅模板配置
    - 上报授权结果
 
+7. **健康文章模块** (`/articles/*`) ✅
+   - 文章列表（支持分类、关键词搜索和分页）
+   - 文章详情（自动增加浏览次数）
+   - 支持四个分类：养生保健、慢病管理、运动与康复、心理健康与社交
+
 ## 后续开发
 
 ### 第二阶段：其他功能模块
@@ -300,10 +308,6 @@ String encodedPassword = encoder.encode(password);
 
 3. **紧急联系人模块** (`/profile/emergency-contacts/*`)
    - 获取/更新紧急联系人
-
-4. **健康文章模块** (`/articles/*`)
-   - 文章列表
-   - 文章详情
 
 5. **家属绑定模块** (`/family/*`)
    - 生成家庭码
