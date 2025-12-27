@@ -11,11 +11,14 @@ import org.health.common.Result;
 import org.health.common.ResultCode;
 import org.health.service.ai.AiChatService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,46 +34,44 @@ public class AiChatController {
     private AiChatService aiChatService;
 
     /**
-     * 发送消息
+     * 发送消息（流式响应）
      * POST /api/v1/ai/chat
      */
-    @Operation(summary = "发送消息", description = "向AI发送消息，支持文本和语音输入")
+    @Operation(summary = "发送消息", description = "向AI发送消息，支持文本和语音输入，返回流式响应")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "发送成功", content = @Content(schema = @Schema(implementation = ChatResponse.class))),
+            @ApiResponse(responseCode = "200", description = "流式响应"),
             @ApiResponse(responseCode = "400", description = "参数错误")
     })
-    @PostMapping("/chat")
-    public Result<ChatResponse> chat(
+    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chat(
             @Parameter(description = "聊天请求参数", required = true) @Valid @RequestBody ChatRequest request) {
+        // 创建 SSE 发射器，设置超时时间为 5 分钟
+        SseEmitter emitter = new SseEmitter(300000L);
+
         try {
             AiChatService.ChatRequest serviceRequest = new AiChatService.ChatRequest();
-            serviceRequest.setSessionId(request.getSessionId());
+            serviceRequest.setConversationId(request.getConversationId());
             serviceRequest.setMessage(request.getMessage());
             serviceRequest.setInputType(request.getInputType());
 
-            AiChatService.ChatResponse serviceResponse = aiChatService.chat(serviceRequest);
+            // 调用服务层发送流式消息
+            // conversation_id 已在 streamChat 方法中通过 emitter 发送
+            aiChatService.streamChat(serviceRequest, emitter);
 
-            ChatResponse response = new ChatResponse();
-            response.setSessionId(serviceResponse.getSessionId());
-            response.setReplyText(serviceResponse.getReplyText());
-            response.setSafetyHint(serviceResponse.getSafetyHint());
+            // 完成流式响应
+            emitter.complete();
 
-            // 转换Service层的MessageVO为Controller层的MessageVO
-            List<MessageVO> messages = serviceResponse.getMessages().stream().map(serviceMessage -> {
-                MessageVO vo = new MessageVO();
-                vo.setRole(serviceMessage.getRole());
-                vo.setContent(serviceMessage.getContent());
-                vo.setInputType(serviceMessage.getInputType());
-                vo.setSafetyHint(serviceMessage.getSafetyHint());
-                vo.setCreatedAt(serviceMessage.getCreatedAt());
-                return vo;
-            }).collect(Collectors.toList());
-            response.setMessages(messages);
-
-            return Result.success(response);
-        } catch (RuntimeException e) {
-            return Result.error(ResultCode.BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .data("{\"event\":\"error\",\"message\":\"" + e.getMessage() + "\"}"));
+                emitter.completeWithError(e);
+            } catch (IOException ex) {
+                emitter.completeWithError(ex);
+            }
         }
+
+        return emitter;
     }
 
     /**
@@ -108,7 +109,7 @@ public class AiChatController {
     })
     @GetMapping("/sessions/{id}/messages")
     public Result<List<MessageVO>> getMessages(
-            @Parameter(description = "会话ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "会话ID（conversation_id）", required = true) @PathVariable String id) {
         try {
             List<AiChatService.MessageVO> serviceMessages = aiChatService.getMessages(id);
 
@@ -133,8 +134,8 @@ public class AiChatController {
      */
     @Schema(description = "聊天请求参数")
     public static class ChatRequest {
-        @Schema(description = "会话ID（可选，为空则创建新会话）", example = "1")
-        private Long sessionId;
+        @Schema(description = "会话ID（可选，为空则创建新会话）", example = "10799fb8-64f7-4296-bbf7-b42bfbe0ae54")
+        private String conversationId;
 
         @Schema(description = "消息内容", example = "你好", required = true)
         @NotBlank(message = "消息内容不能为空")
@@ -146,12 +147,12 @@ public class AiChatController {
         private String inputType;
 
         // Getters and Setters
-        public Long getSessionId() {
-            return sessionId;
+        public String getConversationId() {
+            return conversationId;
         }
 
-        public void setSessionId(Long sessionId) {
-            this.sessionId = sessionId;
+        public void setConversationId(String conversationId) {
+            this.conversationId = conversationId;
         }
 
         public String getMessage() {
@@ -172,63 +173,12 @@ public class AiChatController {
     }
 
     /**
-     * 聊天响应
-     */
-    @Schema(description = "聊天响应")
-    public static class ChatResponse {
-        @Schema(description = "会话ID", example = "1")
-        private Long sessionId;
-
-        @Schema(description = "AI回复文本", example = "你好！有什么可以帮助你的吗？")
-        private String replyText;
-
-        @Schema(description = "安全提示", example = "请注意健康信息仅供参考")
-        private String safetyHint;
-
-        @Schema(description = "最近3轮消息")
-        private List<MessageVO> messages;
-
-        // Getters and Setters
-        public Long getSessionId() {
-            return sessionId;
-        }
-
-        public void setSessionId(Long sessionId) {
-            this.sessionId = sessionId;
-        }
-
-        public String getReplyText() {
-            return replyText;
-        }
-
-        public void setReplyText(String replyText) {
-            this.replyText = replyText;
-        }
-
-        public String getSafetyHint() {
-            return safetyHint;
-        }
-
-        public void setSafetyHint(String safetyHint) {
-            this.safetyHint = safetyHint;
-        }
-
-        public List<MessageVO> getMessages() {
-            return messages;
-        }
-
-        public void setMessages(List<MessageVO> messages) {
-            this.messages = messages;
-        }
-    }
-
-    /**
      * 会话视图对象
      */
     @Schema(description = "会话视图对象")
     public static class SessionVO {
-        @Schema(description = "会话ID", example = "1")
-        private Long id;
+        @Schema(description = "会话ID", example = "10799fb8-64f7-4296-bbf7-b42bfbe0ae54")
+        private String id;
 
         @Schema(description = "会话标题", example = "健康咨询")
         private String title;
@@ -240,11 +190,11 @@ public class AiChatController {
         private java.time.LocalDateTime updatedAt;
 
         // Getters and Setters
-        public Long getId() {
+        public String getId() {
             return id;
         }
 
-        public void setId(Long id) {
+        public void setId(String id) {
             this.id = id;
         }
 

@@ -1,15 +1,13 @@
 package org.health.service.ai;
 
 import org.health.common.UserContext;
-import org.health.entity.ai.AiMessage;
-import org.health.entity.ai.AiSession;
-import org.health.mapper.ai.AiMessageMapper;
-import org.health.mapper.ai.AiSessionMapper;
+import org.health.mapper.UserMapper;
+import org.health.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,40 +18,38 @@ import java.util.stream.Collectors;
 public class AiChatService {
 
   @Autowired
-  private AiSessionMapper aiSessionMapper;
+  private DifyClientService difyClientService;
 
   @Autowired
-  private AiMessageMapper aiMessageMapper;
+  private UserMapper userMapper;
 
   /**
-   * 发送消息
+   * 发送流式消息
    *
    * @param request 聊天请求
-   * @return 聊天响应
+   * @param emitter 流式响应发射器
+   * @return conversationId 会话ID
    */
-  public ChatResponse chat(ChatRequest request) {
+  public String streamChat(ChatRequest request, SseEmitter emitter) {
     Long userId = UserContext.getUserId();
 
-    // TODO: 具体业务逻辑待实现
-    // 1. 如果sessionId为空，创建新会话
-    // 2. 保存用户消息
-    // 3. 调用AI接口获取回复
-    // 4. 保存AI回复
-    // 5. 获取最近3轮消息（6条消息，3对）
-    // 6. 返回响应
+    // 获取用户信息以获取 username
+    User user = userMapper.selectById(userId);
+    if (user == null || user.getUsername() == null) {
+      throw new RuntimeException("用户不存在或用户名无效");
+    }
 
-    ChatResponse response = new ChatResponse();
-    response.setSessionId(1L);
-    response.setReplyText("AI回复功能待实现");
-    response.setSafetyHint(null);
+    String username = user.getUsername();
+    String conversationId = request.getConversationId();
 
-    // TODO: 获取最近3轮消息（6条消息）
-    // List<AiMessage> recentMessages =
-    // aiMessageMapper.selectRecentBySessionId(sessionId, 6);
-    // 转换为MessageVO列表
-    response.setMessages(new ArrayList<>());
+    // 调用 DIFY API 发送流式消息
+    String resultConversationId = difyClientService.streamChat(
+        request.getMessage(),
+        conversationId,
+        username,
+        emitter);
 
-    return response;
+    return resultConversationId;
   }
 
   /**
@@ -64,15 +60,23 @@ public class AiChatService {
   public List<SessionVO> getSessions() {
     Long userId = UserContext.getUserId();
 
-    // TODO: 具体业务逻辑待实现
-    List<AiSession> sessions = aiSessionMapper.selectByUserId(userId);
+    // 获取用户信息以获取 username
+    User user = userMapper.selectById(userId);
+    if (user == null || user.getUsername() == null) {
+      throw new RuntimeException("用户不存在或用户名无效");
+    }
 
-    return sessions.stream().map(session -> {
+    String username = user.getUsername();
+
+    // 从 DIFY 获取会话列表
+    DifyClientService.ConversationsResponse response = difyClientService.getConversations(username);
+
+    return response.getData().stream().map(conv -> {
       SessionVO vo = new SessionVO();
-      vo.setId(session.getId());
-      vo.setTitle(session.getTitle());
-      vo.setCreatedAt(session.getCreatedAt());
-      vo.setUpdatedAt(session.getUpdatedAt());
+      vo.setId(conv.getId());
+      vo.setTitle(conv.getName() != null ? conv.getName() : "新对话");
+      vo.setCreatedAt(conv.getCreatedAt());
+      vo.setUpdatedAt(conv.getUpdatedAt());
       return vo;
     }).collect(Collectors.toList());
   }
@@ -80,28 +84,30 @@ public class AiChatService {
   /**
    * 获取会话消息列表
    *
-   * @param sessionId 会话ID
+   * @param conversationId 会话ID（DIFY的conversation_id）
    * @return 消息列表
    */
-  public List<MessageVO> getMessages(Long sessionId) {
+  public List<MessageVO> getMessages(String conversationId) {
     Long userId = UserContext.getUserId();
 
-    // TODO: 验证会话是否属于当前用户
-    // AiSession session = aiSessionMapper.selectById(sessionId);
-    // if (session == null || !session.getUserId().equals(userId)) {
-    // throw new RuntimeException("会话不存在或无权限");
-    // }
+    // 获取用户信息以获取 username
+    User user = userMapper.selectById(userId);
+    if (user == null || user.getUsername() == null) {
+      throw new RuntimeException("用户不存在或用户名无效");
+    }
 
-    // TODO: 具体业务逻辑待实现
-    List<AiMessage> messages = aiMessageMapper.selectBySessionId(sessionId);
+    String username = user.getUsername();
 
-    return messages.stream().map(message -> {
+    // 从 DIFY 获取消息历史
+    DifyClientService.MessagesResponse response = difyClientService.getMessages(conversationId, username);
+
+    return response.getData().stream().map(msg -> {
       MessageVO vo = new MessageVO();
-      vo.setRole(message.getRole());
-      vo.setContent(message.getContent());
-      vo.setInputType(message.getInputType());
-      vo.setSafetyHint(message.getSafetyHint());
-      vo.setCreatedAt(message.getCreatedAt());
+      vo.setRole(msg.getRole());
+      vo.setContent(msg.getContent());
+      vo.setInputType(msg.getInputType() != null ? msg.getInputType() : "text");
+      vo.setSafetyHint(msg.getSafetyHint());
+      vo.setCreatedAt(msg.getCreatedAt());
       return vo;
     }).collect(Collectors.toList());
   }
@@ -110,16 +116,16 @@ public class AiChatService {
    * 聊天请求
    */
   public static class ChatRequest {
-    private Long sessionId;
+    private String conversationId;
     private String message;
     private String inputType;
 
-    public Long getSessionId() {
-      return sessionId;
+    public String getConversationId() {
+      return conversationId;
     }
 
-    public void setSessionId(Long sessionId) {
-      this.sessionId = sessionId;
+    public void setConversationId(String conversationId) {
+      this.conversationId = conversationId;
     }
 
     public String getMessage() {
@@ -140,61 +146,19 @@ public class AiChatService {
   }
 
   /**
-   * 聊天响应
-   */
-  public static class ChatResponse {
-    private Long sessionId;
-    private String replyText;
-    private String safetyHint;
-    private List<MessageVO> messages;
-
-    public Long getSessionId() {
-      return sessionId;
-    }
-
-    public void setSessionId(Long sessionId) {
-      this.sessionId = sessionId;
-    }
-
-    public String getReplyText() {
-      return replyText;
-    }
-
-    public void setReplyText(String replyText) {
-      this.replyText = replyText;
-    }
-
-    public String getSafetyHint() {
-      return safetyHint;
-    }
-
-    public void setSafetyHint(String safetyHint) {
-      this.safetyHint = safetyHint;
-    }
-
-    public List<MessageVO> getMessages() {
-      return messages;
-    }
-
-    public void setMessages(List<MessageVO> messages) {
-      this.messages = messages;
-    }
-  }
-
-  /**
    * 会话视图对象
    */
   public static class SessionVO {
-    private Long id;
+    private String id;
     private String title;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public Long getId() {
+    public String getId() {
       return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
       this.id = id;
     }
 

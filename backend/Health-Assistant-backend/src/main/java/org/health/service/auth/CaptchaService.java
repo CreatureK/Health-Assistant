@@ -118,6 +118,14 @@ public class CaptchaService {
         long expireTime = System.currentTimeMillis() + expireSeconds * 1000L;
         captchaStore.put(captchaId, new CaptchaInfo(captchaCode.toUpperCase(), expireTime));
 
+        // 在终端输出验证码信息（用于开发调试）
+        System.out.println("========================================");
+        System.out.println("验证码生成成功:");
+        System.out.println("captchaId: " + captchaId);
+        System.out.println("验证码: " + captchaCode.toUpperCase());
+        System.out.println("过期时间: " + expireSeconds + " 秒");
+        System.out.println("========================================");
+
         // 返回结果
         CaptchaResult result = new CaptchaResult();
         result.setCaptchaId(captchaId);
