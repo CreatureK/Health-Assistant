@@ -92,6 +92,13 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- Dotenv for .env file support -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>dotenv-java</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+
         <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

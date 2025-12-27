@@ -6,8 +6,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/health_assistant?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 101895
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
 
 # MyBatis配置
 mybatis:
