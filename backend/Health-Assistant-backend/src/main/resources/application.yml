@@ -43,6 +43,7 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+  packages-to-scan: org.health.controller
 
 # 日志配置
 logging:
