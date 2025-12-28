@@ -1,4 +1,12 @@
-export const BASE_URL = "http://localhost:8080";
+// 优先读环境变量（配合你们的 .env.example）
+// - vue-cli/uniapp 常用：VUE_APP_BASE_URL
+// - Vite(若你们是vite项目)：VITE_BASE_URL
+// export const BASE_URL =
+//   (typeof process !== "undefined" &&
+//     process.env &&
+//     (process.env.VUE_APP_BASE_URL || process.env.VITE_BASE_URL)) ||
+//   "http://192.168.1.107:8080";
+const BASE_URL = 'http://localhost:8080/api/v1';
 
 function getToken() {
   return uni.getStorageSync("token") || "";
@@ -15,7 +23,7 @@ function gotoLoginOnce() {
 /**
  * 统一请求封装
  * - 先按 HTTP 状态码判定是否“传输成功”
- * - 再按接口契约判定 body.code 是否成功（接口文档统一响应 {code,msg,data}）
+ * - 再按接口契约判定 body.code 是否成功（接口文档统一响应 {code,msg,data}） :contentReference[oaicite:7]{index=7}
  *
  * 成功：HTTP 2xx 且 (body.code 不存在 或 body.code === 200)
  * 失败：HTTP 非 2xx 或 body.code 存在且 !== 200
@@ -38,7 +46,7 @@ export function request({ url, method = "GET", data, header }) {
         const status = res.statusCode;
         const body = res.data;
 
-        // 1) HTTP 非 2xx：按你原来的分类处理
+        // 1) HTTP 非 2xx
         if (!(status >= 200 && status < 300)) {
           if (status === 401) {
             uni.removeStorageSync("token");
@@ -70,14 +78,10 @@ export function request({ url, method = "GET", data, header }) {
           return reject({ statusCode: status, body });
         }
 
-        // 2) HTTP 2xx：再按接口文档的 body.code 判断
-        // 文档：统一响应 {code:200,msg:'ok',data:<payload>}
+        // 2) HTTP 2xx：按 body.code 判断
         if (body && typeof body === "object" && "code" in body) {
-          if (body.code === 200) {
-            return resolve(body.data);
-          }
+          if (body.code === 200) return resolve(body.data);
 
-          // code != 200 也算失败（哪怕 HTTP 200）
           if (body.code === 401) {
             uni.removeStorageSync("token");
             uni.showToast({ title: body?.msg || "请先登录", icon: "none" });
@@ -92,7 +96,7 @@ export function request({ url, method = "GET", data, header }) {
           return reject({ statusCode: status, body });
         }
 
-        // 3) 兼容：如果后端某些接口没包 code（极少数），就直接返回 body
+        // 3) 兼容：未包 code 的响应
         return resolve(body);
       },
 
@@ -103,7 +107,5 @@ export function request({ url, method = "GET", data, header }) {
     });
   });
 }
-<<<<<<< HEAD
-export {API} from "./api";
-=======
->>>>>>> master
+
+export { API } from "./api";
