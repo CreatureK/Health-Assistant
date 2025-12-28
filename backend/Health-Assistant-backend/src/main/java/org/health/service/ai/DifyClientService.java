@@ -13,6 +13,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -231,6 +232,108 @@ public class DifyClientService {
         }
       }
       throw new EmitterAlreadyCompletedException("流式聊天请求失败: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * 获取会话列表 - 完全按照 DIFY API 规范
+   *
+   * @param user   用户唯一标识（必填）
+   * @param lastId 分页游标：当前页最后一条记录的 id（可选）
+   * @param limit  每页返回的记录数，取值范围：1-100，默认20（可选）
+   * @param sortBy 排序字段及顺序，默认"-updated_at"（可选）
+   * @return 会话列表响应，包含 limit、has_more、data 字段
+   * @throws RuntimeException 当 API 调用失败时抛出
+   */
+  public Map<String, Object> getConversations(
+      String user,
+      String lastId,
+      Integer limit,
+      String sortBy) {
+    try {
+      // 构建查询参数
+      StringBuilder queryParams = new StringBuilder();
+      queryParams.append("user=").append(URLEncoder.encode(user, StandardCharsets.UTF_8));
+
+      if (lastId != null && !lastId.isEmpty()) {
+        queryParams.append("&last_id=").append(URLEncoder.encode(lastId, StandardCharsets.UTF_8));
+      }
+
+      if (limit != null && limit > 0) {
+        // 限制在 1-100 范围内
+        int actualLimit = Math.min(Math.max(limit, 1), 100);
+        queryParams.append("&limit=").append(actualLimit);
+      } else {
+        queryParams.append("&limit=20");
+      }
+
+      if (sortBy != null && !sortBy.isEmpty()) {
+        queryParams.append("&sort_by=").append(URLEncoder.encode(sortBy, StandardCharsets.UTF_8));
+      } else {
+        queryParams.append("&sort_by=-updated_at");
+      }
+
+      String url = baseUrl + "/v1/conversations?" + queryParams.toString();
+
+      // 验证 apiKey 是否已正确配置
+      if (apiKey == null || apiKey.isEmpty()) {
+        throw new RuntimeException("DIFY_API_KEY 未配置，请检查环境变量或配置文件");
+      }
+
+      // 创建 HTTP 连接
+      URL apiUrl = new java.net.URI(url).toURL();
+      HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
+      connection.setRequestMethod("GET");
+      connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+      connection.setRequestProperty("Accept", "application/json");
+      connection.setDoInput(true);
+
+      logger.debug("向 DIFY 发送请求: URL={}, Authorization=Bearer {}...", url,
+          apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : "***");
+
+      // 检查响应状态
+      int responseCode = connection.getResponseCode();
+      if (responseCode != HttpURLConnection.HTTP_OK) {
+        BufferedReader errorReader = new BufferedReader(
+            new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8));
+        StringBuilder errorResponse = new StringBuilder();
+        String line;
+        while ((line = errorReader.readLine()) != null) {
+          errorResponse.append(line);
+        }
+        errorReader.close();
+        connection.disconnect();
+
+        String errorMessage = "DIFY API 调用失败: " + responseCode + " - " + errorResponse.toString();
+        logger.error(errorMessage);
+        throw new RuntimeException(errorMessage);
+      }
+
+      // 读取响应
+      BufferedReader reader = new BufferedReader(
+          new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+      StringBuilder response = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        response.append(line);
+      }
+      reader.close();
+      connection.disconnect();
+
+      // 解析 JSON 响应
+      String jsonResponse = response.toString();
+      Map<String, Object> result = objectMapper.readValue(jsonResponse,
+          objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
+
+      logger.debug("DIFY API 响应: {}", jsonResponse);
+      return result;
+
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      String errorMessage = "获取会话列表失败: " + e.getMessage();
+      logger.error(errorMessage, e);
+      throw new RuntimeException(errorMessage, e);
     }
   }
 }
