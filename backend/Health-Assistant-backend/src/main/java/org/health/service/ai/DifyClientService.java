@@ -2,23 +2,19 @@ package org.health.service.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,51 +23,98 @@ import java.util.Map;
 @Service
 public class DifyClientService {
 
+  private static final Logger logger = LoggerFactory.getLogger(DifyClientService.class);
+
   @Value("${DIFY_BASE_URL}")
   private String baseUrl;
 
   @Value("${DIFY_API_KEY}")
   private String apiKey;
 
-  private final RestTemplate restTemplate;
   private final ObjectMapper objectMapper;
 
   public DifyClientService() {
-    this.restTemplate = new RestTemplate();
     this.objectMapper = new ObjectMapper();
   }
 
+  @PostConstruct
+  public void init() {
+    // 验证配置是否正确加载
+    if (baseUrl == null || baseUrl.isEmpty()) {
+      logger.error("DIFY_BASE_URL 未配置！");
+    } else {
+      logger.info("DIFY_BASE_URL 已配置: {}", baseUrl);
+    }
+
+    if (apiKey == null || apiKey.isEmpty()) {
+      logger.error("DIFY_API_KEY 未配置！");
+    } else {
+      // 只显示前10个字符，避免泄露完整密钥
+      String maskedKey = apiKey.length() > 10
+          ? apiKey.substring(0, 10) + "..."
+          : "***";
+      logger.info("DIFY_API_KEY 已配置: {}", maskedKey);
+    }
+  }
+
   /**
-   * 发送流式聊天消息
+   * 发送流式聊天消息 - 完全按照 DIFY API 规范
    *
-   * @param query          用户消息
-   * @param conversationId 会话ID（可选，为空则创建新会话）
-   * @param user           用户标识
-   * @param emitter        流式响应发射器
+   * @param query            用户消息（必填）
+   * @param conversationId   会话ID（可选）
+   * @param user             用户标识（必填）
+   * @param inputs           App定义的变量值（可选）
+   * @param autoGenerateName 是否自动生成会话标题（可选）
+   * @param emitter          流式响应发射器
    * @return conversationId 会话ID
    */
-  public String streamChat(String query, String conversationId, String user, SseEmitter emitter) {
+  public String streamChat(
+      String query,
+      String conversationId,
+      String user,
+      Map<String, Object> inputs,
+      Boolean autoGenerateName,
+      SseEmitter emitter) {
     try {
       String url = baseUrl + "/v1/chat-messages";
 
       // 构建请求体（完全符合 DIFY API 文档要求）
       Map<String, Object> requestBody = new HashMap<>();
-      requestBody.put("query", query); // 必填：用户输入/提问内容
-      requestBody.put("response_mode", "streaming"); // 必填：响应模式
-      requestBody.put("user", user); // 必填：用户唯一标识
-      requestBody.put("inputs", new HashMap<>()); // 可选：App 定义的变量值，默认 {}
-      // conversation_id 可选：为空字符串时表示创建新会话，否则延续历史对话
-      requestBody.put("conversation_id", (conversationId != null && !conversationId.isEmpty()) ? conversationId : "");
+      requestBody.put("query", query); // 必填
+      requestBody.put("response_mode", "streaming"); // 必填
+      requestBody.put("user", user); // 必填
+
+      // 可选参数
+      if (conversationId != null && !conversationId.isEmpty()) {
+        requestBody.put("conversation_id", conversationId);
+      } else {
+        requestBody.put("conversation_id", "");
+      }
+
+      requestBody.put("inputs", inputs != null ? inputs : new HashMap<>());
+
+      if (autoGenerateName != null) {
+        requestBody.put("auto_generate_name", autoGenerateName);
+      }
+
+      // 验证 apiKey 是否已正确配置
+      if (apiKey == null || apiKey.isEmpty()) {
+        throw new RuntimeException("DIFY_API_KEY 未配置，请检查环境变量或配置文件");
+      }
 
       // 创建 HTTP 连接
       URL apiUrl = new java.net.URI(url).toURL();
       HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
       connection.setRequestMethod("POST");
+      // 使用 DIFY_API_KEY，而不是用户登录的 token
       connection.setRequestProperty("Authorization", "Bearer " + apiKey);
       connection.setRequestProperty("Content-Type", "application/json");
       connection.setRequestProperty("Accept", "text/event-stream");
       connection.setDoOutput(true);
       connection.setDoInput(true);
+
+      logger.debug("向 DIFY 发送请求: URL={}, Authorization=Bearer {}...", url,
+          apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : "***");
 
       // 发送请求体
       String jsonBody = objectMapper.writeValueAsString(requestBody);
@@ -88,16 +131,33 @@ public class DifyClientService {
           errorResponse.append(line);
         }
         errorReader.close();
-        throw new RuntimeException("DIFY API 调用失败: " + responseCode + " - " + errorResponse.toString());
+        connection.disconnect();
+
+        // 发送错误消息并完成 emitter
+        String errorMessage = "DIFY API 调用失败: " + responseCode + " - " + errorResponse.toString();
+        Map<String, Object> errorData = new HashMap<>();
+        errorData.put("event", "error");
+        errorData.put("status", responseCode);
+        errorData.put("code", "api_error");
+        errorData.put("message", errorMessage);
+
+        try {
+          emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(errorData)));
+          emitter.completeWithError(new RuntimeException(errorMessage));
+        } catch (Exception ex) {
+          try {
+            emitter.completeWithError(new RuntimeException(errorMessage));
+          } catch (Exception ignored) {
+          }
+        }
+        throw new EmitterAlreadyCompletedException(errorMessage);
       }
 
-      // 读取流式响应
+      // 读取流式响应并透传所有事件
       BufferedReader reader = new BufferedReader(
           new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
 
-      String currentConversationId = null;
-      boolean conversationIdSent = false;
-      StringBuilder fullAnswer = new StringBuilder();
+      String currentConversationId = conversationId;
       String line;
 
       while ((line = reader.readLine()) != null) {
@@ -111,60 +171,33 @@ public class DifyClientService {
             JsonNode eventNode = objectMapper.readTree(jsonData);
             String event = eventNode.has("event") ? eventNode.get("event").asText() : "";
 
-            // 处理 message 事件（文本块）
-            if ("message".equals(event)) {
-              // 首次收到 conversation_id 时立即发送
-              if (eventNode.has("conversation_id") && !conversationIdSent) {
-                currentConversationId = eventNode.get("conversation_id").asText();
-                Map<String, Object> convData = new HashMap<>();
-                convData.put("event", "conversation_id");
-                convData.put("conversation_id", currentConversationId);
-                emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(convData)));
-                conversationIdSent = true;
-              }
-
-              if (eventNode.has("answer")) {
-                String answerChunk = eventNode.get("answer").asText();
-                fullAnswer.append(answerChunk);
-
-                // 发送文本块给客户端
-                Map<String, Object> chunkData = new HashMap<>();
-                chunkData.put("event", "message");
-                chunkData.put("answer", answerChunk);
-                emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(chunkData)));
-              }
-
-              // 更新 conversation_id（如果后续事件中有更新）
-              if (eventNode.has("conversation_id")) {
-                currentConversationId = eventNode.get("conversation_id").asText();
-              }
+            // 更新 conversation_id
+            if (eventNode.has("conversation_id")) {
+              currentConversationId = eventNode.get("conversation_id").asText();
             }
-            // 处理 message_end 事件
-            else if ("message_end".equals(event)) {
-              if (eventNode.has("conversation_id")) {
-                currentConversationId = eventNode.get("conversation_id").asText();
-              }
 
-              // 发送结束事件
-              Map<String, Object> endData = new HashMap<>();
-              endData.put("event", "message_end");
-              if (eventNode.has("metadata")) {
-                endData.put("metadata", eventNode.get("metadata"));
-              }
-              emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(endData)));
+            // 透传所有事件类型给客户端
+            // 包括：message, message_file, message_end, tts_message, tts_message_end,
+            // message_replace, error, ping, workflow_started, node_started,
+            // node_finished, workflow_finished 等
+            emitter.send(SseEmitter.event().data(jsonData));
+
+            // message_end 事件后结束
+            if ("message_end".equals(event)) {
               break;
             }
-            // 处理 error 事件
-            else if ("error".equals(event)) {
-              String errorMessage = eventNode.has("message")
+
+            // error 事件后抛出异常
+            if ("error".equals(event)) {
+              String errorMsg = eventNode.has("message")
                   ? eventNode.get("message").asText()
                   : "未知错误";
-              throw new RuntimeException("DIFY API 错误: " + errorMessage);
+              throw new RuntimeException("DIFY API 错误: " + errorMsg);
             }
-            // 忽略 ping 事件
-            else if ("ping".equals(event)) {
-              continue;
-            }
+
+          } catch (RuntimeException e) {
+            // 重新抛出业务异常
+            throw e;
           } catch (Exception e) {
             // JSON 解析错误，继续处理下一行
             continue;
@@ -176,311 +209,28 @@ public class DifyClientService {
       connection.disconnect();
 
       return currentConversationId != null ? currentConversationId : conversationId;
+
+    } catch (EmitterAlreadyCompletedException e) {
+      throw e;
     } catch (Exception e) {
+      // 发送错误消息并完成 emitter
+      Map<String, Object> errorData = new HashMap<>();
+      errorData.put("event", "error");
+      errorData.put("status", 500);
+      errorData.put("code", "internal_error");
+      errorData.put("message", e.getMessage());
+
       try {
         emitter.send(SseEmitter.event()
-            .data(objectMapper.writeValueAsString(Map.of("event", "error", "message", e.getMessage()))));
+            .data(objectMapper.writeValueAsString(errorData)));
         emitter.completeWithError(e);
       } catch (Exception ex) {
-        // 忽略发送错误
-      }
-      throw new RuntimeException("流式聊天请求失败: " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * 获取会话列表
-   *
-   * @param user 用户标识
-   * @return 会话列表响应
-   */
-  public ConversationsResponse getConversations(String user) {
-    try {
-      String url = baseUrl + "/v1/conversations?user=" + user + "&limit=100";
-
-      HttpHeaders headers = new HttpHeaders();
-      headers.set("Authorization", "Bearer " + apiKey);
-      headers.setContentType(MediaType.APPLICATION_JSON);
-
-      HttpEntity<String> entity = new HttpEntity<>(headers);
-      ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-
-      if (response.getStatusCode() == HttpStatus.OK) {
-        JsonNode rootNode = objectMapper.readTree(response.getBody());
-        ConversationsResponse result = new ConversationsResponse();
-        result.setLimit(rootNode.has("limit") ? rootNode.get("limit").asInt() : 0);
-        result.setHasMore(rootNode.has("has_more") ? rootNode.get("has_more").asBoolean() : false);
-
-        List<ConversationVO> conversations = new ArrayList<>();
-        if (rootNode.has("data") && rootNode.get("data").isArray()) {
-          for (JsonNode item : rootNode.get("data")) {
-            ConversationVO vo = new ConversationVO();
-            vo.setId(item.has("id") ? item.get("id").asText() : null);
-            vo.setName(item.has("name") ? item.get("name").asText() : null);
-            vo.setStatus(item.has("status") ? item.get("status").asText() : null);
-            vo.setIntroduction(item.has("introduction") ? item.get("introduction").asText() : null);
-
-            if (item.has("created_at")) {
-              long timestamp = item.get("created_at").asLong();
-              vo.setCreatedAt(LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault()));
-            }
-            if (item.has("updated_at")) {
-              long timestamp = item.get("updated_at").asLong();
-              vo.setUpdatedAt(LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault()));
-            }
-
-            conversations.add(vo);
-          }
+        try {
+          emitter.completeWithError(e);
+        } catch (Exception ignored) {
         }
-        result.setData(conversations);
-        return result;
-      } else {
-        throw new RuntimeException("获取会话列表失败: " + response.getStatusCode());
       }
-    } catch (Exception e) {
-      throw new RuntimeException("获取会话列表失败: " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * 获取会话消息历史
-   *
-   * @param conversationId 会话ID
-   * @param user           用户标识
-   * @return 消息列表响应
-   */
-  public MessagesResponse getMessages(String conversationId, String user) {
-    try {
-      String url = baseUrl + "/v1/messages?conversation_id=" + conversationId + "&user=" + user + "&limit=100";
-
-      HttpHeaders headers = new HttpHeaders();
-      headers.set("Authorization", "Bearer " + apiKey);
-      headers.setContentType(MediaType.APPLICATION_JSON);
-
-      HttpEntity<String> entity = new HttpEntity<>(headers);
-      ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-
-      if (response.getStatusCode() == HttpStatus.OK) {
-        JsonNode rootNode = objectMapper.readTree(response.getBody());
-        MessagesResponse result = new MessagesResponse();
-        result.setLimit(rootNode.has("limit") ? rootNode.get("limit").asInt() : 0);
-        result.setHasMore(rootNode.has("has_more") ? rootNode.get("has_more").asBoolean() : false);
-
-        List<MessageVO> messages = new ArrayList<>();
-        if (rootNode.has("data") && rootNode.get("data").isArray()) {
-          for (JsonNode item : rootNode.get("data")) {
-            // 用户消息
-            if (item.has("query") && !item.get("query").asText().isEmpty()) {
-              MessageVO userMsg = new MessageVO();
-              userMsg.setRole("user");
-              userMsg.setContent(item.get("query").asText());
-              userMsg.setInputType("text");
-              if (item.has("created_at")) {
-                long timestamp = item.get("created_at").asLong();
-                userMsg.setCreatedAt(LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault()));
-              }
-              messages.add(userMsg);
-            }
-
-            // AI回复消息
-            if (item.has("answer") && !item.get("answer").asText().isEmpty()) {
-              MessageVO assistantMsg = new MessageVO();
-              assistantMsg.setRole("assistant");
-              assistantMsg.setContent(item.get("answer").asText());
-              assistantMsg.setInputType("text");
-              if (item.has("created_at")) {
-                long timestamp = item.get("created_at").asLong();
-                assistantMsg
-                    .setCreatedAt(LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault()));
-              }
-              messages.add(assistantMsg);
-            }
-          }
-        }
-        result.setData(messages);
-        return result;
-      } else {
-        throw new RuntimeException("获取消息历史失败: " + response.getStatusCode());
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("获取消息历史失败: " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * 会话列表响应
-   */
-  public static class ConversationsResponse {
-    private int limit;
-    private boolean hasMore;
-    private List<ConversationVO> data;
-
-    public int getLimit() {
-      return limit;
-    }
-
-    public void setLimit(int limit) {
-      this.limit = limit;
-    }
-
-    public boolean isHasMore() {
-      return hasMore;
-    }
-
-    public void setHasMore(boolean hasMore) {
-      this.hasMore = hasMore;
-    }
-
-    public List<ConversationVO> getData() {
-      return data;
-    }
-
-    public void setData(List<ConversationVO> data) {
-      this.data = data;
-    }
-  }
-
-  /**
-   * 会话视图对象
-   */
-  public static class ConversationVO {
-    private String id;
-    private String name;
-    private String status;
-    private String introduction;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    public String getId() {
-      return id;
-    }
-
-    public void setId(String id) {
-      this.id = id;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public void setName(String name) {
-      this.name = name;
-    }
-
-    public String getStatus() {
-      return status;
-    }
-
-    public void setStatus(String status) {
-      this.status = status;
-    }
-
-    public String getIntroduction() {
-      return introduction;
-    }
-
-    public void setIntroduction(String introduction) {
-      this.introduction = introduction;
-    }
-
-    public LocalDateTime getCreatedAt() {
-      return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-      this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-      return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-      this.updatedAt = updatedAt;
-    }
-  }
-
-  /**
-   * 消息列表响应
-   */
-  public static class MessagesResponse {
-    private int limit;
-    private boolean hasMore;
-    private List<MessageVO> data;
-
-    public int getLimit() {
-      return limit;
-    }
-
-    public void setLimit(int limit) {
-      this.limit = limit;
-    }
-
-    public boolean isHasMore() {
-      return hasMore;
-    }
-
-    public void setHasMore(boolean hasMore) {
-      this.hasMore = hasMore;
-    }
-
-    public List<MessageVO> getData() {
-      return data;
-    }
-
-    public void setData(List<MessageVO> data) {
-      this.data = data;
-    }
-  }
-
-  /**
-   * 消息视图对象
-   */
-  public static class MessageVO {
-    private String role;
-    private String content;
-    private String inputType;
-    private String safetyHint;
-    private LocalDateTime createdAt;
-
-    public String getRole() {
-      return role;
-    }
-
-    public void setRole(String role) {
-      this.role = role;
-    }
-
-    public String getContent() {
-      return content;
-    }
-
-    public void setContent(String content) {
-      this.content = content;
-    }
-
-    public String getInputType() {
-      return inputType;
-    }
-
-    public void setInputType(String inputType) {
-      this.inputType = inputType;
-    }
-
-    public String getSafetyHint() {
-      return safetyHint;
-    }
-
-    public void setSafetyHint(String safetyHint) {
-      this.safetyHint = safetyHint;
-    }
-
-    public LocalDateTime getCreatedAt() {
-      return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-      this.createdAt = createdAt;
+      throw new EmitterAlreadyCompletedException("流式聊天请求失败: " + e.getMessage(), e);
     }
   }
 }

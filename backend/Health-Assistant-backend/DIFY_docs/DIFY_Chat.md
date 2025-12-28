@@ -15,7 +15,7 @@
 ### 请求示例（cURL）
 
 ```bash
-curl -X POST 'http://dify.kldrgon.com/v1/chat-messages' \
+curl -X POST 'https://api.dify.ai/v1/chat-messages' \
   --header 'Authorization: Bearer {api_key}' \
   --header 'Content-Type: application/json' \
   --data-raw '{
