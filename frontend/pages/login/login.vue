@@ -47,8 +47,7 @@
 
 
 <script>
-import { request } from "@/common/request";
-import { API } from "@/common/api";
+import { request, API } from "@/common/request";
 
 export default {
   data() {

@@ -76,7 +76,8 @@ export default {
           url: API.medDrugs,
           method: "GET",
           data: {
-            keyword: this.keyword || undefined,
+            keyword: this.keyword ||"",
+			// undefined,
             page: nextPage,
             size: this.size
           }
