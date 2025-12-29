@@ -19,7 +19,7 @@
 
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        r.id, r.plan_id, p.name as plan_name, p.dosage, r.date, r.time, r.status, r.action_at, r.note, r.created_at, r.updated_at
+        r.id, r.plan_id, p.name as plan_name, p.dosage, r.`date`, r.`time`, r.`status`, r.action_at, r.note, r.created_at, r.updated_at
     </sql>
 
     <!-- 根据ID查询记录 -->
@@ -37,7 +37,7 @@
         <include refid="Base_Column_List"/>
         FROM med_record r
         LEFT JOIN med_plan p ON r.plan_id = p.id
-        WHERE r.plan_id = #{planId} AND r.date = #{date} AND r.time = #{time}
+        WHERE r.plan_id = #{planId} AND r.`date` = #{date} AND r.`time` = #{time}
         LIMIT 1
     </select>
 
@@ -47,8 +47,8 @@
         <include refid="Base_Column_List"/>
         FROM med_record r
         LEFT JOIN med_plan p ON r.plan_id = p.id
-        WHERE p.user_id = #{userId} AND r.date = #{date} AND p.deleted_at IS NULL
-        ORDER BY r.time ASC
+        WHERE p.user_id = #{userId} AND r.`date` = #{date} AND p.deleted_at IS NULL
+        ORDER BY r.`time` ASC
     </select>
 
     <!-- 查询记录列表（支持多条件过滤） -->
@@ -66,16 +66,16 @@
                 AND r.plan_id = #{planId}
             </if>
             <if test="status != null and status != ''">
-                AND r.status = #{status}
+                AND r.`status` = #{status}
             </if>
             <if test="startDate != null">
-                AND r.date >= #{startDate}
+                AND r.`date` >= #{startDate}
             </if>
             <if test="endDate != null">
-                AND r.date &lt;= #{endDate}
+                AND r.`date` &lt;= #{endDate}
             </if>
         </if>
-        ORDER BY r.date DESC, r.time ASC
+        ORDER BY r.`date` DESC, r.`time` ASC
         <if test="limit != null and limit > 0">
             LIMIT #{offset}, #{limit}
         </if>
@@ -95,26 +95,26 @@
                 AND r.plan_id = #{planId}
             </if>
             <if test="status != null and status != ''">
-                AND r.status = #{status}
+                AND r.`status` = #{status}
             </if>
             <if test="startDate != null">
-                AND r.date >= #{startDate}
+                AND r.`date` >= #{startDate}
             </if>
             <if test="endDate != null">
-                AND r.date &lt;= #{endDate}
+                AND r.`date` &lt;= #{endDate}
             </if>
         </if>
     </select>
 
     <!-- 插入记录 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO med_record (plan_id, date, time, status, action_at, note, created_at, updated_at)
+        INSERT INTO med_record (plan_id, `date`, `time`, `status`, action_at, note, created_at, updated_at)
         VALUES (#{planId}, #{date}, #{time}, #{status}, #{actionAt}, #{note}, NOW(), NOW())
     </insert>
 
     <!-- 批量插入记录 -->
     <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO med_record (plan_id, date, time, status, action_at, note, created_at, updated_at)
+        INSERT INTO med_record (plan_id, `date`, `time`, `status`, action_at, note, created_at, updated_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.planId}, #{item.date}, #{item.time}, #{item.status}, #{item.actionAt}, #{item.note}, NOW(), NOW())
@@ -124,7 +124,7 @@
     <!-- 更新记录状态 -->
     <update id="updateStatus">
         UPDATE med_record
-        SET status = #{status},
+        SET `status` = #{status},
         <choose>
             <when test="status != null and status.equals('todo')">
                 action_at = NULL,
@@ -141,7 +141,7 @@
     <update id="update">
         UPDATE med_record
         <set>
-            <if test="status != null">status = #{status},</if>
+            <if test="status != null">`status` = #{status},</if>
             <if test="actionAt != null">action_at = #{actionAt},</if>
             <if test="note != null">note = #{note},</if>
             updated_at = NOW()
@@ -152,13 +152,13 @@
     <!-- 根据计划ID和日期范围删除记录 -->
     <delete id="deleteByPlanIdAndDate">
         DELETE FROM med_record
-        WHERE plan_id = #{planId} AND date >= #{startDate}
+        WHERE plan_id = #{planId} AND `date` >= #{startDate}
     </delete>
 
     <!-- 删除计划未来的todo记录 -->
     <delete id="deleteFutureTodoRecordsByPlanId">
         DELETE FROM med_record
-        WHERE plan_id = #{planId} AND date > #{startDate} AND status = 'todo'
+        WHERE plan_id = #{planId} AND `date` > #{startDate} AND `status` = 'todo'
     </delete>
 
 </mapper>

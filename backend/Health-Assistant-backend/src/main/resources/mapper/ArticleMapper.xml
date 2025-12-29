@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.ArticleMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.Article">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="category" property="category"/>
+        <result column="content" property="content"/>
+        <result column="cover_image" property="coverImage"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, title, category, content, cover_image, view_count, created_at, updated_at
+    </sql>
+
+    <!-- 根据ID查询文章 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM article
+        WHERE id = #{id}
+    </select>
+
+    <!-- 查询文章列表 -->
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM article
+        <where>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%')
+                OR MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE))
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        <if test="limit != null and limit > 0">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 统计文章总数 -->
+    <select id="countList" resultType="int">
+        SELECT COUNT(*)
+        FROM article
+        <where>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%')
+                OR MATCH(title, content) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE))
+            </if>
+        </where>
+    </select>
+
+    <!-- 增加浏览次数 -->
+    <update id="incrementViewCount">
+        UPDATE article
+        SET view_count = view_count + 1
+        WHERE id = #{id}
+    </update>
+
+</mapper>
+
