@@ -24,6 +24,7 @@
  * GET        /api/v1/wechat/subscribe/config
  * POST       /api/v1/wechat/subscribe/report
  *
+<<<<<<< HEAD
  * 第二阶段：AI 对话 & 健康文章（你后端已做） :contentReference[oaicite:5]{index=5} :contentReference[oaicite:6]{index=6}
  * POST       /api/v1/ai/chat
  * GET        /api/v1/ai/sessions
@@ -32,6 +33,15 @@
  * GET        /api/v1/articles
  * GET        /api/v1/articles/:id
  * ==============================================
+=======
+ * ------------------ 药品库（新增） ---------------------------
+ * GET    /api/v1/med/drugs                     query: {keyword?, page?, size?}
+ * GET    /api/v1/med/drugs/:id
+ *
+ * GET    /api/v1/wechat/subscribe/config       -> {templateIds:[]}
+ * POST   /api/v1/wechat/subscribe/report       body: {granted:boolean, detail?:object}
+ * ============================================================
+>>>>>>> origin/master
  */
 
 export const API = {
@@ -57,7 +67,12 @@ export const API = {
   medDrugs: "/med/drugs",
   medDrugDetail: (id) => `/med/drugs/${id}`,
 
+  // drugs
+  medDrugs: "/api/v1/med/drugs", // GET
+  medDrugDetail: (id) => `/api/v1/med/drugs/${id}`, // GET
+
   // wechat subscribe
+<<<<<<< HEAD
   wechatSubscribeConfig: "/wechat/subscribe/config",
   wechatSubscribeReport: "/wechat/subscribe/report",
 
@@ -69,4 +84,8 @@ export const API = {
   aiChat: "/ai/chat",
   aiSessions: "/ai/sessions",
   aiSessionMessages: (id) => `/ai/sessions/${id}/messages`
+=======
+  wechatSubscribeConfig: "/api/v1/wechat/subscribe/config", // GET
+  wechatSubscribeReport: "/api/v1/wechat/subscribe/report" // POST
+>>>>>>> origin/master
 };

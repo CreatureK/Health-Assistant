@@ -34,13 +34,15 @@ public class MedRecordController {
      * 查询记录
      * GET /api/v1/med/records
      */
-    @Operation(summary = "查询记录", description = "支持按计划、状态、日期区间过滤")
+    @Operation(summary = "查询记录", description = "支持按ID、计划、状态、日期区间过滤。如果提供了id参数，优先使用id查询")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "查询成功",
                     content = @Content(schema = @Schema(implementation = MedRecordService.RecordListVO.class)))
     })
     @GetMapping
     public Result<MedRecordService.RecordListVO> getRecordList(
+            @Parameter(description = "记录ID")
+            @RequestParam(required = false) Long id,
             @Parameter(description = "计划ID")
             @RequestParam(required = false) Long planId,
             @Parameter(description = "状态：todo|taken|missed")
@@ -53,7 +55,7 @@ public class MedRecordController {
             @RequestParam(required = false) Integer page,
             @Parameter(description = "每页大小", example = "20")
             @RequestParam(required = false) Integer size) {
-        MedRecordService.RecordListVO result = medRecordService.getRecordList(planId, status, startDate, endDate, page, size);
+        MedRecordService.RecordListVO result = medRecordService.getRecordList(id, planId, status, startDate, endDate, page, size);
         return Result.success(result);
     }
 
@@ -61,7 +63,7 @@ public class MedRecordController {
      * 标记已服用/未服
      * POST /api/v1/med/records/:recordId/mark
      */
-    @Operation(summary = "标记已服用/未服", description = "标记记录为已服用或未服，actionAt默认写入当前时间")
+    @Operation(summary = "标记已服用/未服", description = "标记记录为已服用、未服或待打卡。taken/missed时actionAt默认写入当前时间，改回todo时清空actionAt")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "标记成功"),
             @ApiResponse(responseCode = "400", description = "参数错误"),
@@ -120,7 +122,7 @@ public class MedRecordController {
      */
     @Schema(description = "标记记录请求参数")
     public static class MarkRecordRequest {
-        @Schema(description = "状态", example = "taken", allowableValues = {"taken", "missed"}, required = true)
+        @Schema(description = "状态", example = "taken", allowableValues = {"todo", "taken", "missed"}, required = true)
         @NotBlank(message = "状态不能为空")
         private String status;
 

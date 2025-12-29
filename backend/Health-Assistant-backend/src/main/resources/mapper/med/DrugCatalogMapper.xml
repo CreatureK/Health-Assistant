@@ -18,7 +18,7 @@
 
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        id, name, common_names, tags, intro, usage, warnings, disclaimer, created_at, updated_at
+        id, name, common_names, tags, intro, `usage`, warnings, disclaimer, created_at, updated_at
     </sql>
 
     <!-- 根据ID查询药品 -->

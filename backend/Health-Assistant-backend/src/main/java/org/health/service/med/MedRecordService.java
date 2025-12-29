@@ -25,6 +25,7 @@ public class MedRecordService {
     /**
      * 查询记录列表
      *
+     * @param id 记录ID（可选，如果提供则优先使用）
      * @param planId 计划ID（可选）
      * @param status 状态（可选）
      * @param startDate 开始日期（可选）
@@ -33,7 +34,7 @@ public class MedRecordService {
      * @param size 每页大小
      * @return 记录列表
      */
-    public RecordListVO getRecordList(Long planId, String status, LocalDate startDate, LocalDate endDate,
+    public RecordListVO getRecordList(Long id, Long planId, String status, LocalDate startDate, LocalDate endDate,
                                        Integer page, Integer size) {
         Long userId = UserContext.getUserId();
 
@@ -48,8 +49,8 @@ public class MedRecordService {
         int offset = (page - 1) * size;
 
         // 查询列表
-        List<MedRecord> records = medRecordMapper.selectList(userId, planId, status, startDate, endDate, offset, size);
-        int total = medRecordMapper.countList(userId, planId, status, startDate, endDate);
+        List<MedRecord> records = medRecordMapper.selectList(userId, id, planId, status, startDate, endDate, offset, size);
+        int total = medRecordMapper.countList(userId, id, planId, status, startDate, endDate);
 
         RecordListVO vo = new RecordListVO();
         vo.setList(records.stream().map(this::convertToVO).collect(Collectors.toList()));
@@ -64,7 +65,7 @@ public class MedRecordService {
      * 标记已服用/未服
      *
      * @param recordId 记录ID
-     * @param status 状态（taken|missed）
+     * @param status 状态（todo|taken|missed）
      */
     @Transactional(rollbackFor = Exception.class)
     public void markRecord(Long recordId, String status) {
@@ -76,11 +77,11 @@ public class MedRecordService {
         // 注意：这里需要验证record的plan是否属于当前用户，简化处理
 
         // 验证状态
-        if (!"taken".equals(status) && !"missed".equals(status)) {
-            throw new RuntimeException("状态必须是taken或missed");
+        if (!"todo".equals(status) && !"taken".equals(status) && !"missed".equals(status)) {
+            throw new RuntimeException("状态必须是todo、taken或missed");
         }
 
-        // 更新状态
+        // 更新状态（根据状态决定是否设置actionAt）
         medRecordMapper.updateStatus(recordId, status);
     }
 

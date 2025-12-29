@@ -31,7 +31,7 @@ public class SubscribeController {
      * 获取订阅模板配置
      * GET /api/v1/wechat/subscribe/config
      */
-    @Operation(summary = "获取订阅模板配置", description = "获取可用的订阅消息模板ID列表")
+    @Operation(summary = "获取订阅模板", description = "获取可用的订阅消息模板ID列表，用于微信小程序订阅消息授权。响应格式：{ \"templateIds\": [\"TEMPLATE_ID_1\"] }")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "查询成功",
                     content = @Content(schema = @Schema(implementation = SubscribeService.SubscribeConfigVO.class)))
@@ -46,7 +46,7 @@ public class SubscribeController {
      * 上报授权结果
      * POST /api/v1/wechat/subscribe/report
      */
-    @Operation(summary = "上报授权结果", description = "上报用户对订阅消息的授权结果")
+    @Operation(summary = "上报授权结果", description = "上报用户对订阅消息的授权结果，detail中每个模板ID对应授权状态（accept/reject/ban）")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "上报成功")
     })
@@ -70,7 +70,8 @@ public class SubscribeController {
         @NotNull(message = "授权状态不能为空")
         private Boolean granted;
 
-        @Schema(description = "授权详情", example = "{\"TEMPLATE_ID_1\": \"accept\"}")
+        @Schema(description = "授权详情，key为模板ID，value为授权状态（accept/reject/ban）", 
+                example = "{\"TEMPLATE_ID_1\": \"accept\"}")
         private Map<String, String> detail;
 
         public Boolean getGranted() { return granted; }

@@ -28,18 +28,18 @@ public class DrugController {
      * 药品搜索列表
      * GET /api/v1/med/drugs
      */
-    @Operation(summary = "药品搜索列表", description = "根据关键词搜索药品")
+    @Operation(summary = "药品搜索列表", description = "根据关键词搜索药品，支持分页查询")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "查询成功",
                     content = @Content(schema = @Schema(implementation = DrugService.DrugListVO.class)))
     })
     @GetMapping
     public Result<DrugService.DrugListVO> searchDrugs(
-            @Parameter(description = "关键词")
+            @Parameter(description = "关键词（可选，用于搜索药品名称）", example = "阿司匹林")
             @RequestParam(required = false) String keyword,
-            @Parameter(description = "页码", example = "1")
+            @Parameter(description = "页码（可选，默认为1）", example = "1")
             @RequestParam(required = false) Integer page,
-            @Parameter(description = "每页大小", example = "20")
+            @Parameter(description = "每页大小（可选，默认为20）", example = "20")
             @RequestParam(required = false) Integer size) {
         DrugService.DrugListVO result = drugService.searchDrugs(keyword, page, size);
         return Result.success(result);
@@ -49,14 +49,15 @@ public class DrugController {
      * 药品详情
      * GET /api/v1/med/drugs/:id
      */
-    @Operation(summary = "药品详情", description = "获取药品的详细信息和说明")
+    @Operation(summary = "药品详情", description = "获取药品的详细信息和说明，包含通俗说明、使用方法、注意事项和免责声明")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "查询成功"),
+            @ApiResponse(responseCode = "200", description = "查询成功",
+                    content = @Content(schema = @Schema(implementation = DrugService.DrugDetailVO.class))),
             @ApiResponse(responseCode = "404", description = "药品不存在")
     })
     @GetMapping("/{id}")
     public Result<DrugService.DrugDetailVO> getDrugDetail(
-            @Parameter(description = "药品ID", required = true)
+            @Parameter(description = "药品ID", required = true, example = "1")
             @PathVariable Long id) {
         try {
             DrugService.DrugDetailVO result = drugService.getDrugDetail(id);

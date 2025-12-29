@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.health.mapper.ai.AiSessionMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="org.health.entity.ai.AiSession">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="title" property="title"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted_at" property="deletedAt"/>
+    </resultMap>
+
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, title, created_at, updated_at, deleted_at
+    </sql>
+
+    <!-- 根据ID查询会话 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM ai_session
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <!-- 根据用户ID查询会话列表 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM ai_session
+        WHERE user_id = #{userId} AND deleted_at IS NULL
+        ORDER BY updated_at DESC
+    </select>
+
+    <!-- 插入会话 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_session (user_id, title, created_at, updated_at)
+        VALUES (#{userId}, #{title}, NOW(), NOW())
+    </insert>
+
+    <!-- 更新会话 -->
+    <update id="update">
+        UPDATE ai_session
+        <set>
+            <if test="title != null">title = #{title},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <!-- 软删除会话 -->
+    <update id="deleteById">
+        UPDATE ai_session
+        SET deleted_at = NOW()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+</mapper>
+

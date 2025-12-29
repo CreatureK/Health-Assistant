@@ -1,14 +1,9 @@
 package org.health.common;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 /**
  * 错误码枚举
  * 符合接口文档规范
  */
-@Getter
-@AllArgsConstructor
 public enum ResultCode {
     /**
      * 成功
@@ -47,4 +42,17 @@ public enum ResultCode {
 
     private final Integer code;
     private final String msg;
+
+    ResultCode(Integer code, String msg) {
+        this.code = code;
+        this.msg = msg;
+    }
+
+    public Integer getCode() {
+        return code;
+    }
+
+    public String getMsg() {
+        return msg;
+    }
 }

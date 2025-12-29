@@ -46,6 +46,7 @@ public interface MedRecordMapper {
      * 查询记录列表（支持多条件过滤）
      *
      * @param userId 用户ID
+     * @param id 记录ID（可选，如果提供则优先使用）
      * @param planId 计划ID（可选）
      * @param status 状态（可选）
      * @param startDate 开始日期（可选）
@@ -55,6 +56,7 @@ public interface MedRecordMapper {
      * @return 记录列表
      */
     List<MedRecord> selectList(@Param("userId") Long userId,
+                                @Param("id") Long id,
                                 @Param("planId") Long planId,
                                 @Param("status") String status,
                                 @Param("startDate") LocalDate startDate,
@@ -66,6 +68,7 @@ public interface MedRecordMapper {
      * 统计记录总数
      *
      * @param userId 用户ID
+     * @param id 记录ID（可选，如果提供则优先使用）
      * @param planId 计划ID（可选）
      * @param status 状态（可选）
      * @param startDate 开始日期（可选）
@@ -73,6 +76,7 @@ public interface MedRecordMapper {
      * @return 总数
      */
     int countList(@Param("userId") Long userId,
+                   @Param("id") Long id,
                    @Param("planId") Long planId,
                    @Param("status") String status,
                    @Param("startDate") LocalDate startDate,
