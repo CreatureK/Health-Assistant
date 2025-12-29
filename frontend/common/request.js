@@ -36,13 +36,30 @@ export function request({ url, method = "GET", data, header }) {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       success(res) {
-        // 兼容：你的后端可能直接返回 Result，也可能直接返回数据
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data);
-        } else {
+        // HTTP 层成功
+        if (!(res.statusCode >= 200 && res.statusCode < 300)) {
           reject(res);
+          return;
         }
+      
+        const r = res.data;
+      
+        // ✅ 按接口文档：统一返回 { code, msg, data }
+        if (r && typeof r === "object" && Object.prototype.hasOwnProperty.call(r, "code")) {
+          if (r.code === 200) {
+            // 🔥 只把 payload(data) 返回给页面，页面就能直接 data.token / data.list ...
+            resolve(r.data);
+          } else {
+            // 业务失败：把 msg 透出，方便页面 toast
+            reject(r);
+          }
+          return;
+        }
+      
+        // ✅ 兜底：如果后端不是统一包装，就原样返回
+        resolve(r);
       },
+
       fail(err) {
         reject(err);
       }
