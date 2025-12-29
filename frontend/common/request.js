@@ -1,32 +1,26 @@
-// 优先读环境变量（配合你们的 .env.example）
-// - vue-cli/uniapp 常用：VUE_APP_BASE_URL
-// - Vite(若你们是vite项目)：VITE_BASE_URL
-// export const BASE_URL =
-//   (typeof process !== "undefined" &&
-//     process.env &&
-//     (process.env.VUE_APP_BASE_URL || process.env.VITE_BASE_URL)) ||
-//   "http://192.168.1.107:8080";
-const BASE_URL = 'http://localhost:8080/api/v1';
+// common/request.js
+import { API } from "./api";
+
+// ✅ BASE_URL：优先环境变量，其次回退本地后端
+// - vue-cli/uniapp：VUE_APP_BASE_URL
+// - Vite：VITE_BASE_URL
+const BASE_URL =
+  (typeof process !== "undefined" &&
+    process.env &&
+    (process.env.VUE_APP_BASE_URL || process.env.VITE_BASE_URL)) ||
+  "http://localhost:8080/api/v1";
 
 function getToken() {
-  return uni.getStorageSync("token") || "";
-}
-
-function gotoLoginOnce() {
-  const pages = getCurrentPages();
-  const cur = pages?.[pages.length - 1]?.route || "";
-  if (cur !== "pages/login/login") {
-    uni.reLaunch({ url: "/pages/login/login" });
-  }
+  return (
+    uni.getStorageSync("token") ||
+    uni.getStorageSync("Authorization") ||
+    uni.getStorageSync("access_token") ||
+    ""
+  );
 }
 
 /**
- * 统一请求封装
- * - 先按 HTTP 状态码判定是否“传输成功”
- * - 再按接口契约判定 body.code 是否成功（接口文档统一响应 {code,msg,data}） :contentReference[oaicite:7]{index=7}
- *
- * 成功：HTTP 2xx 且 (body.code 不存在 或 body.code === 200)
- * 失败：HTTP 非 2xx 或 body.code 存在且 !== 200
+ * 普通 HTTP 请求（uni.request）
  */
 export function request({ url, method = "GET", data, header }) {
   return new Promise((resolve, reject) => {
@@ -41,71 +35,87 @@ export function request({ url, method = "GET", data, header }) {
         ...(header || {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-
       success(res) {
-        const status = res.statusCode;
-        const body = res.data;
-
-        // 1) HTTP 非 2xx
-        if (!(status >= 200 && status < 300)) {
-          if (status === 401) {
-            uni.removeStorageSync("token");
-            uni.showToast({ title: "请先登录", icon: "none" });
-            gotoLoginOnce();
-            return reject({ statusCode: status, body });
-          }
-
-          if (status >= 400 && status < 500) {
-            uni.showToast({
-              title: body?.msg || body?.message || `请求错误(${status})`,
-              icon: "none"
-            });
-            return reject({ statusCode: status, body });
-          }
-
-          if (status >= 500 && status < 600) {
-            uni.showToast({
-              title: body?.msg || body?.message || `服务异常(${status})`,
-              icon: "none"
-            });
-            return reject({ statusCode: status, body });
-          }
-
-          uni.showToast({
-            title: body?.msg || body?.message || `请求失败(${status})`,
-            icon: "none"
-          });
-          return reject({ statusCode: status, body });
+        // 兼容：你的后端可能直接返回 Result，也可能直接返回数据
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data);
+        } else {
+          reject(res);
         }
-
-        // 2) HTTP 2xx：按 body.code 判断
-        if (body && typeof body === "object" && "code" in body) {
-          if (body.code === 200) return resolve(body.data);
-
-          if (body.code === 401) {
-            uni.removeStorageSync("token");
-            uni.showToast({ title: body?.msg || "请先登录", icon: "none" });
-            gotoLoginOnce();
-            return reject({ statusCode: status, body });
-          }
-
-          uni.showToast({
-            title: body?.msg || `请求失败(code=${body.code})`,
-            icon: "none"
-          });
-          return reject({ statusCode: status, body });
-        }
-
-        // 3) 兼容：未包 code 的响应
-        return resolve(body);
       },
-
       fail(err) {
-        uni.showToast({ title: "网络异常", icon: "none" });
         reject(err);
       }
     });
   });
 }
 
-export { API } from "./api";
+/**
+ * ✅ SSE 流式请求（H5 专用：fetch + ReadableStream）
+ * 后端返回 Content-Type: text/event-stream
+ *
+ * @param {Object} options
+ * @param {string} options.url  例如：/ai/chat-messages
+ * @param {string} [options.method="POST"]
+ * @param {Object} options.data
+ * @param {(evt:any)=>void} options.onEvent
+ */
+export async function requestSse({ url, method = "POST", data, onEvent }) {
+  if (typeof window === "undefined" || typeof fetch === "undefined") {
+    throw new Error("SSE only supported in H5 (browser) environment");
+  }
+
+  const token = getToken();
+
+  const resp = await fetch(BASE_URL + url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(data)
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text || `HTTP ${resp.status}`);
+  }
+
+  if (!resp.body) {
+    throw new Error("No response body (ReadableStream not supported)");
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE：事件之间用空行分隔
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const evt of events) {
+      const lines = evt.split("\n");
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+
+        const payload = line.replace(/^data:\s*/, "").trim();
+        if (!payload) continue;
+
+        try {
+          onEvent && onEvent(JSON.parse(payload));
+        } catch {
+          // 非 JSON 就忽略
+        }
+      }
+    }
+  }
+}
+
+export { API };
