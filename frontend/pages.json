@@ -1,57 +1,64 @@
 {
 	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
-		// {
-		//   "path": "pages/login/login",
-		//   "style": { "navigationBarTitleText": "用户登录" }
-		// },
-		// {
-		//   "path": "pages/med/plan-list",
-		//   "style": { "navigationBarTitleText": "用药计划" }
-		// },
-		// {
-		//   "path": "pages/login/register",
-		//   "style": { "navigationBarTitleText": "用户注册" }
-		// },
-		// {
-		//   "path": "pages/med/plan-edit",
-		//   "style": { "navigationBarTitleText": "编辑用药计划" }
-		// },
-		// {
-		//   "path": "pages/med/plan-detail",
-		//   "style": { "navigationBarTitleText": "计划详情" }
-		// },
-		// {
-		//   "path": "pages/med/today-checkin",
-		//   "style": { "navigationBarTitleText": "今日用药" }
-		// },
-		// {
-		//   "path": "pages/med/record-list",
-		//   "style": { "navigationBarTitleText": "用药记录" }
-		// },
-		// {
-		//   "path": "pages/med/record-adjust",
-		//   "style": { "navigationBarTitleText": "补记/更正" }
-		// },
-		// {
-		//   "path": "pages/med/subscribe-guide",
-		//   "style": { "navigationBarTitleText": "开启提醒" }
-		// },
-		{
-		  "path": "pages/hub/entry",
-		  "style": { "navigationBarTitleText": "功能选择" }
-		},
-		{
-		  "path": "pages/health/knowledge-list",
-		  "style": { "navigationBarTitleText": "健康知识" }
-		},
-		{
-		  "path": "pages/health/ai-chat",
-		  "style": { "navigationBarTitleText": "AI 健康助手" }
-		},
-		{
-		  "path": "pages/health/diary",
-		  "style": { "navigationBarTitleText": "健康日记" }
-		}
+			{
+			  "path": "pages/login/login",
+			  "style": { "navigationBarTitleText": "用户登录" }
+			},
+			{
+		      "path": "pages/hub/entry",
+		      "style": { "navigationBarTitleText": "功能选择" }
+		    },
+		    {
+		      "path": "pages/med/plan-list",
+		      "style": { "navigationBarTitleText": "用药计划" }
+		    },
+		    {
+		      "path": "pages/login/register",
+		      "style": { "navigationBarTitleText": "用户注册" }
+		    },
+		    {
+		      "path": "pages/med/plan-edit",
+		      "style": { "navigationBarTitleText": "编辑用药计划" }
+		    },
+		    {
+		      "path": "pages/med/plan-detail",
+		      "style": { "navigationBarTitleText": "计划详情" }
+		    },
+		    {
+		      "path": "pages/med/today-checkin",
+		      "style": { "navigationBarTitleText": "今日用药" }
+		    },
+		    {
+		      "path": "pages/med/record-list",
+		      "style": { "navigationBarTitleText": "用药记录" }
+		    },
+		    {
+		      "path": "pages/med/record-adjust",
+		      "style": { "navigationBarTitleText": "补记/更正" }
+		    },
+		    // {
+		    //   "path": "pages/med/subscribe-guide",
+		    //   "style": { "navigationBarTitleText": "开启提醒" }
+		    // },
+		
+		    {
+		      "path": "pages/health/knowledge-list",
+		      "style": { "navigationBarTitleText": "健康知识" }
+		    },
+		    {
+		      "path": "pages/health/ai-chat",
+		      "style": { "navigationBarTitleText": "AI 健康助手" }
+		    },
+		
+		    // 新增：药品库（替代原健康日记）
+		    {
+		      "path": "pages/med/drug-list",
+		      "style": { "navigationBarTitleText": "药品库" }
+		    },
+		    {
+		      "path": "pages/med/drug-detail",
+		      "style": { "navigationBarTitleText": "药品详情" }
+		    }
 
 	],
 	"globalStyle": {

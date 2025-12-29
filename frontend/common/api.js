@@ -1,46 +1,72 @@
 /**
- * ================== 接口契约（给后端同学）==================
+ * ================== API 列表 ==================
+ * 统一响应：{ code:200, msg:"ok", data:<payload> }  :contentReference[oaicite:4]{index=4}
+ *
+ * 登录：
  * GET  /api/v1/auth/captcha
  * POST /api/v1/auth/login
+ * POST /api/v1/auth/register
  *
- * ------------------ 用药管理（新增） -------------------------
- * GET    /api/v1/med/plans
- * POST   /api/v1/med/plans
- * GET    /api/v1/med/plans/:id
- * PUT    /api/v1/med/plans/:id
- * DELETE /api/v1/med/plans/:id
- * POST   /api/v1/med/plans/:id/remind          body: {remindEnabled}
+ * 用药管理：
+ * GET/POST   /api/v1/med/plans
+ * GET/PUT/DELETE /api/v1/med/plans/:id
+ * POST       /api/v1/med/plans/:id/remind
+ * GET        /api/v1/med/today
+ * GET        /api/v1/med/records
+ * POST       /api/v1/med/records/:recordId/mark
+ * POST       /api/v1/med/records/:recordId/adjust
  *
- * GET    /api/v1/med/today                     query: {date}
+ * 药品库：
+ * GET        /api/v1/med/drugs
+ * GET        /api/v1/med/drugs/:id
  *
- * POST   /api/v1/med/records/:recordId/mark    body: {status} taken|missed
- * POST   /api/v1/med/records/:recordId/adjust  body: {status, actionAt?, note?}
- * GET    /api/v1/med/records                   query: {planId?, status?, startDate?, endDate?, id?}
+ * 订阅：
+ * GET        /api/v1/wechat/subscribe/config
+ * POST       /api/v1/wechat/subscribe/report
  *
- * GET    /api/v1/wechat/subscribe/config       -> {templateIds:[]}
- * POST   /api/v1/wechat/subscribe/report       body: {granted:boolean, detail?:object}
- * ============================================================
+ * 第二阶段：AI 对话 & 健康文章（你后端已做） :contentReference[oaicite:5]{index=5} :contentReference[oaicite:6]{index=6}
+ * POST       /api/v1/ai/chat
+ * GET        /api/v1/ai/sessions
+ * GET        /api/v1/ai/sessions/:id/messages
+ *
+ * GET        /api/v1/articles
+ * GET        /api/v1/articles/:id
+ * ==============================================
  */
+
 export const API = {
   // auth
-  captcha: "/api/v1/auth/captcha",
-  login: "/api/v1/auth/login",
-  register: "/api/v1/auth/register",
+  captcha: "/auth/captcha",
+  login: "/auth/login",
+  register: "/auth/register",
 
   // med plans
-  medPlans: "/api/v1/med/plans", // GET/POST
-  medPlanDetail: (id) => `/api/v1/med/plans/${id}`, // GET/PUT/DELETE
-  medPlanRemind: (id) => `/api/v1/med/plans/${id}/remind`, // POST
+  medPlans: "/med/plans",
+  medPlanDetail: (id) => `/med/plans/${id}`,
+  medPlanRemind: (id) => `/med/plans/${id}/remind`,
 
   // today
-  medToday: "/api/v1/med/today", // GET
+  medToday: "/med/today",
 
   // records
-  medRecords: "/api/v1/med/records", // GET
-  medRecordMark: (recordId) => `/api/v1/med/records/${recordId}/mark`, // POST
-  medRecordAdjust: (recordId) => `/api/v1/med/records/${recordId}/adjust`, // POST
+  medRecords: "/med/records",
+  medRecordMark: (recordId) => `/med/records/${recordId}/mark`,
+  medRecordAdjust: (recordId) => `/med/records/${recordId}/adjust`,
+
+  // drugs
+  medDrugs: "/med/drugs",
+  medDrugDetail: (id) => `/med/drugs/${id}`,
 
   // wechat subscribe
-  wechatSubscribeConfig: "/api/v1/wechat/subscribe/config", // GET
-  wechatSubscribeReport: "/api/v1/wechat/subscribe/report"  // POST
+  wechatSubscribeConfig: "/wechat/subscribe/config",
+  wechatSubscribeReport: "/wechat/subscribe/report",
+
+  // health articles
+  articles: "/articles",
+  articleDetail: (id) => `/articles/${id}`,
+
+  // AI chat
+  aiChat: "/ai/chat",
+  aiSessions: "/ai/sessions",
+  aiSessionMessages: (id) => `/ai/sessions/${id}/messages`
 };

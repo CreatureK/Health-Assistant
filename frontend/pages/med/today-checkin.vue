@@ -4,7 +4,7 @@
       <view class="row head">
         <view class="head-left">
           <text class="title">今日用药</text>
-          <text v-if="isMock" class="badge">示例数据</text>
+          <!-- <text v-if="isMock" class="badge">示例数据</text> -->
         </view>
         <picker mode="date" :value="date" @change="onPickDate">
           <view class="pick">{{ date }}</view>
@@ -71,12 +71,16 @@ export default {
           data: { date: this.date }
         });
         const list = Array.isArray(data) ? data : (data?.list || []);
-        this.isMock = !list.length;
-        this.records = list.length ? list : mockRecords(this.date);
+        this.isMock =false;
+		 // !list.length;
+        this.records =list;
+		 // list.length ? list : mockRecords(this.date);
       } catch (e) {
         // 网络/后端异常时也用示例数据，方便调试页面
-        this.isMock = true;
-        this.records = mockRecords(this.date);
+        this.isMock = false;
+		// true;
+        this.records =[];
+		 // mockRecords(this.date);
       } finally {
         this.loading = false;
       }
