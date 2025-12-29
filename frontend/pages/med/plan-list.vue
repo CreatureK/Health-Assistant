@@ -43,8 +43,7 @@
 </template>
 
 <script>
-import { request } from "@/common/request";
-import { API } from "@/common/api";
+import { request, API } from "@/common/request";
 
 // ✅ 开关：后端没做好就 true；后端好了改成 false
 const USE_MOCK = false;
