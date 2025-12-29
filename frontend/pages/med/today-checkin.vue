@@ -72,12 +72,16 @@ export default {
           data: { date: this.date }
         });
         const list = Array.isArray(data) ? data : (data?.list || []);
-        this.isMock = !list.length;
-        this.records = list.length ? list : mockRecords(this.date);
+        this.isMock =false;
+		 // !list.length;
+        this.records =list;
+		 // list.length ? list : mockRecords(this.date);
       } catch (e) {
         // 网络/后端异常时也用示例数据，方便调试页面
-        this.isMock = true;
-        this.records = mockRecords(this.date);
+        this.isMock = false;
+		// true;
+        this.records =[];
+		 // mockRecords(this.date);
       } finally {
         this.loading = false;
       }

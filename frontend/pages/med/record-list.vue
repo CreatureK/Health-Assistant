@@ -126,16 +126,29 @@ export default {
       const status = this.statusOptions[this.statusIndex];
 
       try {
-        const data = await request({
-          url: API.medRecords,
-          method: "GET",
-          data: {
-            planId: this.planId || undefined,
-            status: status === "all" ? undefined : status,
-            startDate: this.startDate,
-            endDate: this.endDate,
-          },
-        });
+		  const params = {
+		    startDate: this.startDate,
+		    endDate: this.endDate,
+		  };
+		  
+		  if (this.planId) params.planId = Number(this.planId);          // ✅ 有才传，并转数字
+		  if (status !== "all") params.status = status;                  // ✅ 有筛选才传
+		  
+		  const data = await request({
+		    url: API.medRecords,
+		    method: "GET",
+		    data: params,
+		  });
+        // const data = await request({
+        //   url: API.medRecords,
+        //   method: "GET",
+        //   data: {
+        //     planId: this.planId || undefined,
+        //     status: status === "all" ? undefined : status,
+        //     startDate: this.startDate,
+        //     endDate: this.endDate,
+        //   },
+        // });
 
         const arr = Array.isArray(data) ? data : (data?.list || []);
 
