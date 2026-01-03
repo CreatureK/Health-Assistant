@@ -100,7 +100,7 @@ export default {
       loading: false,
       scrollTop: 0,
       scrollIntoView: "",
-      conversationId: uni.getStorageSync("ai_conversation_id") || "",
+      conversationId: "",
       messages: [
         {
           role: "ai",
@@ -117,10 +117,17 @@ export default {
     };
   },
   onLoad() {
+    // 每次进入页面都创建新会话
+    this.conversationId = "";
+    uni.removeStorageSync("ai_conversation_id");
+    this.messages = [
+      {
+        role: "ai",
+        content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+        timestamp: Date.now()
+      }
+    ];
     this.fetchConversations();
-    if (this.conversationId) {
-      this.fetchMessages(this.conversationId);
-    }
   },
   onShow() {
     this.fetchConversations();
