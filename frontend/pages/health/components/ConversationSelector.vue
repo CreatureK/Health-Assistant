@@ -1,10 +1,5 @@
 <template>
   <view class="selector-wrapper">
-    <view class="selector-trigger" @click="handleToggle">
-      <text class="trigger-text">{{ currentConversationName || "选择会话" }}</text>
-      <text class="trigger-arrow" :class="{ open: visible }">▼</text>
-    </view>
-
     <view v-if="visible" class="selector-dropdown">
       <view v-if="loading" class="dropdown-loading">加载中...</view>
       <view v-else-if="!conversations || conversations.length === 0" class="dropdown-empty">
@@ -99,48 +94,8 @@ export default {
   width: 100%;
 }
 
-.selector-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  padding: 16rpx 24rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  font-size: 26rpx;
-  transition: all 0.2s;
-  backdrop-filter: blur(10rpx);
-}
-
-.selector-trigger:active {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(0.98);
-}
-
-.trigger-text {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.trigger-arrow {
-  font-size: 20rpx;
-  transition: transform 0.3s ease;
-  opacity: 0.8;
-}
-
-.trigger-arrow.open {
-  transform: rotate(180deg);
-}
-
 .selector-dropdown {
-  position: absolute;
-  top: calc(100% + 12rpx);
-  left: 0;
-  right: 0;
+  position: relative;
   width: 100%;
   max-height: 500rpx;
   background: #ffffff;
@@ -149,6 +104,7 @@ export default {
   z-index: 1000;
   overflow: hidden;
   animation: slideDown 0.2s ease-out;
+  margin-top: 12rpx;
 }
 
 @keyframes slideDown {
@@ -190,7 +146,7 @@ export default {
 }
 
 .dropdown-item.active {
-  background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: #f7fafc;
 }
 
 .dropdown-item.active::before {
@@ -200,7 +156,7 @@ export default {
   top: 0;
   bottom: 0;
   width: 4rpx;
-  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
 }
 
 .item-name {

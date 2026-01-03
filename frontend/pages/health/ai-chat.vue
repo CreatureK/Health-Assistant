@@ -1,16 +1,15 @@
 <template>
   <view class="page">
-    <view class="topbar">
-      <view class="topbar-header">
-        <view class="topbar-title">AI 健康助手</view>
-        <view class="topbar-actions">
-          <view class="btn-icon" @click="clearChat">
-            <text class="icon">🗑️</text>
-          </view>
+    <view class="topbar-fixed">
+      <view class="topbar-actions-fixed">
+        <view class="btn-selector" @click="toggleSelector">
+          <text class="icon-selector">📋</text>
+        </view>
+        <view class="btn-new-chat-icon" @click="clearChat">
+          <text class="icon-new">➕</text>
         </view>
       </view>
-      <view class="topbar-sub">随时问我健康相关问题（仅科普建议）</view>
-      <view class="topbar-selector-wrapper">
+      <view v-if="conversationSelectorVisible" class="selector-fixed-wrapper">
         <ConversationSelector
           :conversations="conversations"
           :current-id="conversationId"
@@ -285,8 +284,8 @@ export default {
 
     clearChat() {
       uni.showModal({
-        title: "确认清空",
-        content: "确定要清空当前对话吗？",
+        title: "新会话",
+        content: "确定要创建新会话吗？当前对话将被保存。",
         success: (res) => {
           if (res.confirm) {
             this.messages = [
@@ -433,67 +432,60 @@ export default {
   background: #f5f7fa;
   display: flex;
   flex-direction: column;
+  padding-top: calc(var(--status-bar-height) + 100rpx);
 }
 
-.topbar {
-  padding: calc(var(--status-bar-height) + 16rpx) 24rpx 20rpx;
-  background: linear-gradient(180deg, #1a1f2e 0%, #2d3748 100%);
-  color: #fff;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+.topbar-fixed {
+  position: fixed;
+  top: calc(var(--status-bar-height));
+  right: 24rpx;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-.topbar-header {
+.topbar-actions-fixed {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16rpx;
   margin-bottom: 12rpx;
 }
 
-.topbar-title {
-  font-size: 36rpx;
-  font-weight: 700;
-  letter-spacing: 0.5rpx;
-}
-
-.topbar-sub {
-  font-size: 24rpx;
-  opacity: 0.85;
-  margin-bottom: 16rpx;
-}
-
-.topbar-selector-wrapper {
-  margin-top: 8rpx;
-}
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-}
-
-.btn-icon {
+.btn-selector,
+.btn-new-chat-icon {
   width: 64rpx;
   height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
 }
 
-.btn-icon:active {
-  background: rgba(255, 255, 255, 0.2);
+.btn-selector:active,
+.btn-new-chat-icon:active {
   transform: scale(0.95);
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.15);
 }
 
-.btn-icon .icon {
+.icon-selector,
+.icon-new {
   font-size: 32rpx;
+}
+
+.selector-fixed-wrapper {
+  position: relative;
+  width: 400rpx;
 }
 
 .chat {
   flex: 1;
   padding: 24rpx;
   overflow-y: auto;
+  padding-bottom: 140rpx;
 }
 
 .chat-inner {
@@ -583,12 +575,12 @@ export default {
 }
 
 .avatar-ai {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: #fff;
 }
 
 .avatar-user {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: #718096;
   color: #fff;
 }
 
@@ -609,7 +601,7 @@ export default {
 }
 
 .bubble-user {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: #ffffff;
   border-bottom-right-radius: 8rpx;
 }
@@ -662,11 +654,16 @@ export default {
 }
 
 .composer {
-  background: #ffffff;
+  position: fixed;
+  bottom: 20rpx;
+  left: 0;
+  right: 0;
+  background: transparent;
   padding: 20rpx 24rpx;
   padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid #e2e8f0;
   box-shadow: 0 -4rpx 12rpx rgba(0, 0, 0, 0.04);
+  z-index: 999;
 }
 
 .composer-inner {
@@ -688,8 +685,8 @@ export default {
 
 .composer-input:focus {
   background: #ffffff;
-  border-color: #667eea;
-  box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+  border-color: #4a5568;
+  box-shadow: 0 0 0 4rpx rgba(74, 85, 104, 0.1);
 }
 
 .composer-btn {
@@ -699,17 +696,17 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4a5568;
   color: #fff;
   font-size: 36rpx;
   border: none;
-  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
   transition: all 0.2s;
 }
 
 .composer-btn:not(.disabled):active {
   transform: scale(0.95);
-  box-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.4);
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.2);
 }
 
 .composer-btn.disabled {
