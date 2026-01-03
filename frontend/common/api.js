@@ -26,6 +26,7 @@
  *
  * AI（你自建后端）：
  * POST       /api/v1/ai/chat-messages   ✅（你 Swagger 里这个是存在的）
+ * GET        /api/v1/ai/conversations   ✅ 获取会话列表
  *
  * ================== Dify 官方 API（直连） ==================
  * POST /v1/chat-messages
@@ -66,7 +67,8 @@ export const API = {
   articleDetail: (id) => `/articles/${id}`,
 
   // ✅ AI chat（新接口）
-  aiChatMessages: "/ai/chat-messages"
+  aiChatMessages: "/ai/chat-messages",
+  aiConversations: "/ai/conversations"
 };
 
 export const DIFY_API = {

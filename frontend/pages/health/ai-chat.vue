@@ -1,10 +1,24 @@
 <template>
   <view class="page">
     <view class="topbar">
-      <view class="topbar-title">AI 健康助手</view>
+      <view class="topbar-header">
+        <view class="topbar-title">AI 健康助手</view>
+        <view class="topbar-actions">
+          <view class="btn-icon" @click="clearChat">
+            <text class="icon">🗑️</text>
+          </view>
+        </view>
+      </view>
       <view class="topbar-sub">随时问我健康相关问题（仅科普建议）</view>
-      <view class="topbar-actions">
-        <view class="btn-ghost" @click="clearChat">清空</view>
+      <view class="topbar-selector-wrapper">
+        <ConversationSelector
+          :conversations="conversations"
+          :current-id="conversationId"
+          :loading="conversationsLoading"
+          :visible="conversationSelectorVisible"
+          @select="onSelectConversation"
+          @toggle="toggleSelector"
+        />
       </view>
     </view>
 
@@ -13,80 +27,211 @@
       scroll-y
       :scroll-top="scrollTop"
       :scroll-with-animation="true"
+      :scroll-into-view="scrollIntoView"
     >
       <view class="chat-inner">
+        <view v-if="messages.length === 1 && messages[0].role === 'ai'" class="welcome">
+          <view class="welcome-icon">💬</view>
+          <view class="welcome-title">开始对话</view>
+          <view class="welcome-desc">描述你的健康问题，我会给出科普建议</view>
+        </view>
         <view
           v-for="(m, i) in messages"
           :key="i"
-          class="row"
-          :class="m.role === 'user' ? 'row-user' : 'row-ai'"
+          :id="`msg-${i}`"
+          class="message-wrapper"
+          :class="m.role === 'user' ? 'message-user' : 'message-ai'"
         >
-          <view v-if="m.role === 'ai'" class="avatar avatar-ai">AI</view>
-          <view class="bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-ai'">
-            <text class="bubble-text">{{ m.content }}</text>
+          <view class="message-row">
+            <view v-if="m.role === 'ai'" class="avatar avatar-ai">AI</view>
+            <view class="message-content">
+              <view class="bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-ai'">
+                <view v-if="m.role === 'ai' && !m.content && loading" class="typing-indicator">
+                  <view class="typing-dot"></view>
+                  <view class="typing-dot"></view>
+                  <view class="typing-dot"></view>
+                </view>
+                <text v-else class="bubble-text">{{ m.content || "正在思考..." }}</text>
+              </view>
+              <view v-if="m.timestamp" class="message-time">{{ formatMessageTime(m.timestamp) }}</view>
+            </view>
+            <view v-if="m.role === 'user'" class="avatar avatar-user">我</view>
           </view>
-          <view v-if="m.role === 'user'" class="avatar avatar-user">我</view>
         </view>
       </view>
     </scroll-view>
 
     <view class="composer">
-      <input
-        class="composer-input"
-        v-model="input"
-        :disabled="loading"
-        placeholder="输入你的问题，比如：我头痛..."
-        confirm-type="send"
-        @confirm="send"
-      />
-      <button class="composer-btn" :disabled="loading || !input.trim()" @click="send">
-        {{ loading ? "发送中" : "发送" }}
-      </button>
+      <view class="composer-inner">
+        <input
+          class="composer-input"
+          v-model="input"
+          :disabled="loading"
+          placeholder="输入你的问题..."
+          confirm-type="send"
+          @confirm="send"
+          @focus="onInputFocus"
+          @blur="onInputBlur"
+        />
+        <button
+          class="composer-btn"
+          :class="{ disabled: loading || !input.trim() }"
+          :disabled="loading || !input.trim()"
+          @click="send"
+        >
+          <text v-if="loading" class="btn-loading">⏳</text>
+          <text v-else class="btn-icon">📤</text>
+        </button>
+      </view>
     </view>
   </view>
 </template>
 
 <script>
 import { request, requestSse, API } from "@/common/request";
+import ConversationSelector from "./components/ConversationSelector.vue";
 
 export default {
+  components: {
+    ConversationSelector
+  },
   data() {
     return {
       input: "",
       loading: false,
       scrollTop: 0,
+      scrollIntoView: "",
       conversationId: uni.getStorageSync("ai_conversation_id") || "",
       messages: [
         {
           role: "ai",
-          content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。"
+          content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+          timestamp: Date.now()
         }
       ],
-      _scrollLock: false
+      _scrollLock: false,
+      conversations: [],
+      conversationsLoading: false,
+      conversationSelectorVisible: false,
+      inputFocused: false
     };
   },
+  onLoad() {
+    this.fetchConversations();
+  },
+  onShow() {
+    this.fetchConversations();
+  },
   methods: {
-    bumpScroll() {
-      if (this._scrollLock) return;
-      this._scrollLock = true;
-      setTimeout(() => {
-        this.scrollTop += 999999;
-        this._scrollLock = false;
-      }, 30);
+    async fetchConversations() {
+      this.conversationsLoading = true;
+      try {
+        const data = await request({
+          url: API.aiConversations,
+          method: "GET",
+          data: {
+            limit: 50
+          }
+        });
+        // 响应结构：data.data 是会话列表数组
+        this.conversations = Array.isArray(data?.data) ? data.data : [];
+      } catch (e) {
+        console.error("[fetchConversations failed]", e);
+        this.conversations = [];
+      } finally {
+        this.conversationsLoading = false;
+      }
     },
 
-    clearChat() {
+    toggleSelector() {
+      this.conversationSelectorVisible = !this.conversationSelectorVisible;
+    },
+
+    onSelectConversation(conversation) {
+      if (!conversation || !conversation.id) return;
+      
+      // 切换会话：更新 conversationId，清空当前消息
+      this.conversationId = conversation.id;
+      uni.setStorageSync("ai_conversation_id", conversation.id);
+      
+      // 清空消息，显示欢迎语
       this.messages = [
         {
           role: "ai",
-          content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。"
+          content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+          timestamp: Date.now()
         }
       ];
-      this.input = "";
-      this.loading = false;
-      this.conversationId = "";
-      uni.removeStorageSync("ai_conversation_id");
+      
       this.$nextTick(() => this.bumpScroll());
+    },
+
+    formatMessageTime(timestamp) {
+      if (!timestamp) return "";
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      
+      if (minutes < 1) return "刚刚";
+      if (minutes < 60) return `${minutes}分钟前`;
+      
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}小时前`;
+      
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hoursStr = String(date.getHours()).padStart(2, "0");
+      const minutesStr = String(date.getMinutes()).padStart(2, "0");
+      return `${month}-${day} ${hoursStr}:${minutesStr}`;
+    },
+
+    bumpScroll() {
+      if (this._scrollLock) return;
+      this._scrollLock = true;
+      this.$nextTick(() => {
+        const lastIndex = this.messages.length - 1;
+        if (lastIndex >= 0) {
+          this.scrollIntoView = `msg-${lastIndex}`;
+        }
+        setTimeout(() => {
+          this.scrollTop += 999999;
+          this._scrollLock = false;
+        }, 100);
+      });
+    },
+
+    onInputFocus() {
+      this.inputFocused = true;
+      setTimeout(() => this.bumpScroll(), 300);
+    },
+
+    onInputBlur() {
+      this.inputFocused = false;
+    },
+
+    clearChat() {
+      uni.showModal({
+        title: "确认清空",
+        content: "确定要清空当前对话吗？",
+        success: (res) => {
+          if (res.confirm) {
+            this.messages = [
+              {
+                role: "ai",
+                content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+                timestamp: Date.now()
+              }
+            ];
+            this.input = "";
+            this.loading = false;
+            this.conversationId = "";
+            uni.removeStorageSync("ai_conversation_id");
+            this.fetchConversations();
+            this.$nextTick(() => this.bumpScroll());
+          }
+        }
+      });
     },
 
     normalizeBlockingReply(data) {
@@ -106,11 +251,11 @@ export default {
       this.input = "";
 
       // 用户消息
-      this.messages.push({ role: "user", content });
+      this.messages.push({ role: "user", content, timestamp: Date.now() });
       this.$nextTick(() => this.bumpScroll());
 
       // AI 占位消息（流式更新）
-      const aiMsg = { role: "ai", content: "" };
+      const aiMsg = { role: "ai", content: "", timestamp: Date.now() };
       this.messages.push(aiMsg);
       const aiIndex = this.messages.length - 1;
       this.$nextTick(() => this.bumpScroll());
@@ -160,11 +305,15 @@ export default {
           if (cid) {
             this.conversationId = cid;
             uni.setStorageSync("ai_conversation_id", cid);
+            // 发送消息后刷新会话列表
+            this.fetchConversations();
           }
 
           if (!this.messages[aiIndex].content) {
-            this.messages[aiIndex].content = "（没有拿到回复内容）";
+            this.messages[aiIndex].content = "抱歉，没有收到回复，请稍后重试。";
           }
+          // 更新消息时间戳
+          this.messages[aiIndex].timestamp = Date.now();
         } else {
           // 非 H5：走 blocking（uni.request 没法读 SSE 流）
           const data = await request({
@@ -181,13 +330,21 @@ export default {
           if (cid) {
             this.conversationId = cid;
             uni.setStorageSync("ai_conversation_id", cid);
+            this.fetchConversations();
           }
 
           this.messages[aiIndex].content =
-            this.normalizeBlockingReply(data) || "（没有拿到回复内容）";
+            this.normalizeBlockingReply(data) || "抱歉，没有收到回复，请稍后重试。";
+          this.messages[aiIndex].timestamp = Date.now();
         }
       } catch (e) {
         this.messages[aiIndex].content = "AI 服务暂时不可用，请稍后再试。";
+        this.messages[aiIndex].timestamp = Date.now();
+        uni.showToast({
+          title: e?.msg || e?.message || "请求失败",
+          icon: "none",
+          duration: 2000
+        });
       } finally {
         this.loading = false;
         this.$nextTick(() => this.bumpScroll());
@@ -200,145 +357,296 @@ export default {
 <style scoped>
 .page {
   min-height: 100vh;
-  background: #f6f7fb;
+  background: #f5f7fa;
   display: flex;
   flex-direction: column;
 }
 
 .topbar {
-  padding: 22rpx 24rpx 18rpx;
-  background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+  padding: calc(var(--status-bar-height) + 16rpx) 24rpx 20rpx;
+  background: linear-gradient(180deg, #1a1f2e 0%, #2d3748 100%);
   color: #fff;
-  position: relative;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+}
+
+.topbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
 }
 
 .topbar-title {
-  text-align: center;
-  font-size: 34rpx;
-  font-weight: 800;
-  letter-spacing: 1rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  letter-spacing: 0.5rpx;
 }
 
 .topbar-sub {
-  text-align: center;
-  margin-top: 8rpx;
   font-size: 24rpx;
-  opacity: 0.7;
+  opacity: 0.85;
+  margin-bottom: 16rpx;
+}
+
+.topbar-selector-wrapper {
+  margin-top: 8rpx;
 }
 
 .topbar-actions {
-  position: absolute;
-  right: 18rpx;
-  top: 18rpx;
+  display: flex;
+  align-items: center;
 }
 
-.btn-ghost {
-  padding: 10rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+.btn-icon {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  transition: all 0.2s;
+}
+
+.btn-icon:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.95);
+}
+
+.btn-icon .icon {
+  font-size: 32rpx;
 }
 
 .chat {
   flex: 1;
   padding: 24rpx;
+  overflow-y: auto;
 }
 
 .chat-inner {
-  padding-bottom: 80rpx;
+  padding-bottom: 40rpx;
 }
 
-.row {
+.welcome {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  text-align: center;
+}
+
+.welcome-icon {
+  font-size: 120rpx;
+  margin-bottom: 32rpx;
+  opacity: 0.8;
+}
+
+.welcome-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 16rpx;
+}
+
+.welcome-desc {
+  font-size: 28rpx;
+  color: #718096;
+  line-height: 1.6;
+}
+
+.message-wrapper {
+  margin-bottom: 32rpx;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.message-user {
+  flex-direction: row-reverse;
+}
+
+.message-content {
+  flex: 1;
+  max-width: 75%;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-user .message-content {
   align-items: flex-end;
-  margin-bottom: 18rpx;
 }
 
-.row-ai {
-  justify-content: flex-start;
-}
-
-.row-user {
-  justify-content: flex-end;
+.message-ai .message-content {
+  align-items: flex-start;
 }
 
 .avatar {
-  width: 58rpx;
-  height: 58rpx;
-  border-radius: 18rpx;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22rpx;
-  font-weight: 800;
+  font-size: 24rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
 }
 
 .avatar-ai {
-  background: #eef1ff;
-  color: #3a5bfd;
-  margin-right: 14rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
 }
 
 .avatar-user {
-  background: #111827;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: #fff;
-  margin-left: 14rpx;
 }
 
 .bubble {
-  max-width: 72%;
-  padding: 18rpx 20rpx;
-  border-radius: 20rpx;
-  line-height: 1.6;
-  box-shadow: 0 6rpx 18rpx rgba(17, 24, 39, 0.06);
+  padding: 20rpx 24rpx;
+  border-radius: 24rpx;
+  line-height: 1.7;
+  word-wrap: break-word;
+  position: relative;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
 }
 
 .bubble-ai {
   background: #ffffff;
-  color: #111827;
-  border: 1rpx solid #eef0f4;
+  color: #2d3748;
+  border: 1rpx solid #e2e8f0;
+  border-bottom-left-radius: 8rpx;
 }
 
 .bubble-user {
-  background: linear-gradient(135deg, #111827 0%, #2f3542 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #ffffff;
+  border-bottom-right-radius: 8rpx;
 }
 
 .bubble-text {
-  font-size: 28rpx;
+  font-size: 30rpx;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.composer {
-  background: #ffffff;
-  padding: 18rpx 18rpx env(safe-area-inset-bottom);
+.typing-indicator {
   display: flex;
   align-items: center;
-  gap: 14rpx;
-  border-top: 1rpx solid #eef0f4;
+  gap: 8rpx;
+  padding: 8rpx 0;
+}
+
+.typing-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #a0aec0;
+  animation: typing 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-10rpx);
+    opacity: 1;
+  }
+}
+
+.message-time {
+  font-size: 22rpx;
+  color: #a0aec0;
+  margin-top: 8rpx;
+  padding: 0 4rpx;
+}
+
+.composer {
+  background: #ffffff;
+  padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #e2e8f0;
+  box-shadow: 0 -4rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.composer-inner {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
 .composer-input {
   flex: 1;
-  height: 74rpx;
-  border-radius: 18rpx;
-  padding: 0 20rpx;
-  font-size: 28rpx;
-  background: #f3f5f9;
+  height: 80rpx;
+  border-radius: 40rpx;
+  padding: 0 28rpx;
+  font-size: 30rpx;
+  background: #f7fafc;
+  border: 2rpx solid transparent;
+  transition: all 0.2s;
+}
+
+.composer-input:focus {
+  background: #ffffff;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
 }
 
 .composer-btn {
-  width: 160rpx;
-  height: 74rpx;
-  border-radius: 18rpx;
-  font-size: 28rpx;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
-  background: #111827;
+  font-size: 36rpx;
+  border: none;
+  box-shadow: 0 4rpx 12rpx rgba(102, 126, 234, 0.3);
+  transition: all 0.2s;
 }
 
-.composer-btn[disabled] {
-  opacity: 0.5;
+.composer-btn:not(.disabled):active {
+  transform: scale(0.95);
+  box-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.4);
+}
+
+.composer-btn.disabled {
+  opacity: 0.4;
+  background: #cbd5e0;
+  box-shadow: none;
+}
+
+.btn-loading,
+.btn-icon {
+  font-size: 36rpx;
 }
 </style>
