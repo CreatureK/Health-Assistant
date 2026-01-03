@@ -45,12 +45,25 @@
             <view v-if="m.role === 'ai'" class="avatar avatar-ai">AI</view>
             <view class="message-content">
               <view class="bubble" :class="m.role === 'user' ? 'bubble-user' : 'bubble-ai'">
-                <view v-if="m.role === 'ai' && !m.content && loading" class="typing-indicator">
+                <view v-if="m.role === 'ai' && !m.content && !m.thinking && loading" class="typing-indicator">
                   <view class="typing-dot"></view>
                   <view class="typing-dot"></view>
                   <view class="typing-dot"></view>
                 </view>
-                <text v-else class="bubble-text">{{ m.content || "正在思考..." }}</text>
+                <template v-else>
+                  <!-- 思考内容 -->
+                  <view v-if="m.role === 'ai' && m.thinking" class="thinking-content">
+                    <view class="thinking-header" @click="toggleThinking(i)">
+                      <view class="thinking-label">思考过程</view>
+                      <text class="thinking-toggle">{{ m.thinkingExpanded ? '收起' : '展开' }}</text>
+                    </view>
+                    <view v-if="m.thinkingExpanded" class="thinking-text-wrapper">
+                      <text class="thinking-text">{{ m.thinking }}</text>
+                    </view>
+                  </view>
+                  <!-- 正式回答 -->
+                  <text v-if="m.content" class="bubble-text">{{ m.content }}</text>
+                </template>
               </view>
               <view v-if="m.timestamp" class="message-time">{{ formatMessageTime(m.timestamp) }}</view>
             </view>
@@ -188,13 +201,12 @@ export default {
           
           // AI 消息
           if (msg.answer) {
-            // 清理 <think> 标签（AI 内部推理过程）
-            let cleanAnswer = msg.answer;
-            cleanAnswer = cleanAnswer.replace(/<think>[\s\S]*?<\/redacted_reasoning>/g, "").trim();
-            
+            const parsed = this.parseStreamText(msg.answer);
             formattedMessages.push({
               role: "ai",
-              content: cleanAnswer,
+              content: parsed.answer,
+              thinking: parsed.thinking,
+              thinkingExpanded: false,
               timestamp: msg.createdAt ? msg.createdAt * 1000 : Date.now()
             });
           }
@@ -314,12 +326,40 @@ export default {
     },
 
     normalizeBlockingReply(data) {
-      if (!data) return "";
-      if (typeof data === "string") return data;
-      if (data.answer) return data.answer;
-      if (data.data && data.data.answer) return data.data.answer;
-      if (data.data && typeof data.data === "string") return data.data;
-      return data.msg || data.message || "";
+      if (!data) return { thinking: "", answer: "" };
+      let text = "";
+      if (typeof data === "string") text = data;
+      else if (data.answer) text = data.answer;
+      else if (data.data && data.data.answer) text = data.data.answer;
+      else if (data.data && typeof data.data === "string") text = data.data;
+      else text = data.msg || data.message || "";
+      return this.parseStreamText(text);
+    },
+
+    parseStreamText(text) {
+      if (!text || typeof text !== "string") {
+        return { thinking: "", answer: "" };
+      }
+      
+      // 提取思考内容（匹配 <think>...</think> 或 <think>...</think>）
+      const thinkingMatch = text.match(/<think>([\s\S]*?)<\/redacted_reasoning>/i) || 
+                           text.match(/<think>([\s\S]*?)<\/think>/i);
+      const thinking = thinkingMatch ? thinkingMatch[1].trim() : "";
+      
+      // 提取正式回答（移除思考标签后的内容）
+      const answer = text
+        .replace(/<think>[\s\S]*?<\/redacted_reasoning>/gi, "")
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/\n+/g, "\n")
+        .trim();
+      
+      return { thinking, answer };
+    },
+
+    toggleThinking(index) {
+      if (this.messages[index] && this.messages[index].role === "ai") {
+        this.$set(this.messages[index], "thinkingExpanded", !this.messages[index].thinkingExpanded);
+      }
     },
 
     async send() {
@@ -334,7 +374,7 @@ export default {
       this.$nextTick(() => this.bumpScroll());
 
       // AI 占位消息（流式更新）
-      const aiMsg = { role: "ai", content: "", timestamp: Date.now() };
+      const aiMsg = { role: "ai", content: "", thinking: "", thinkingExpanded: false, timestamp: Date.now() };
       this.messages.push(aiMsg);
       const aiIndex = this.messages.length - 1;
       this.$nextTick(() => this.bumpScroll());
@@ -353,6 +393,38 @@ export default {
         if (isH5) {
           let reply = "";
           let cid = "";
+          let messageId = "";
+          
+          // 打字机效果：队列和延时处理
+          const chunkQueue = [];
+          let isProcessingQueue = false;
+          let streamEnded = false;
+          
+          // 处理队列中的chunk，带随机延时
+          const processChunkQueue = () => {
+            if (isProcessingQueue || chunkQueue.length === 0) return;
+            
+            isProcessingQueue = true;
+            const chunk = chunkQueue.shift();
+            
+            if (chunk) {
+              reply += chunk;
+              const parsed = this.parseStreamText(reply);
+              this.messages[aiIndex].thinking = parsed.thinking;
+              this.messages[aiIndex].content = parsed.answer;
+              this.$nextTick(() => this.bumpScroll());
+            }
+            
+            // 随机延时
+            const delay = Math.random() * 30 + 20;
+            setTimeout(() => {
+              isProcessingQueue = false;
+              // 如果队列还有内容或流未结束，继续处理
+              if (chunkQueue.length > 0 || !streamEnded) {
+                processChunkQueue();
+              }
+            }, delay);
+          };
 
           await requestSse({
             url: API.aiChatMessages, // ✅ 必须是 /ai/chat-messages
@@ -360,26 +432,77 @@ export default {
             data: payload,
             onEvent: (evt) => {
               const type = evt?.event || "";
-              if (evt?.conversation_id) cid = evt.conversation_id;
+              
+              // 更新 conversation_id
+              if (evt?.conversation_id) {
+                cid = evt.conversation_id;
+              }
+              
+              // 更新 message_id（用于识别同一消息的多个片段）
+              if (evt?.message_id || evt?.id) {
+                messageId = evt.message_id || evt.id;
+              }
 
-              if (type === "message" || type === "agent_message") {
-                const chunk = evt?.answer || evt?.message || "";
+              // 处理流式消息片段
+              if (type === "message") {
+                const chunk = evt?.answer || "";
                 if (chunk) {
-                  reply += chunk;
-                  this.messages[aiIndex].content = reply;
-                  this.$nextTick(() => this.bumpScroll());
+                  chunkQueue.push(chunk);
+                  processChunkQueue();
                 }
               }
 
-              if (type === "error") {
-                throw new Error(evt?.message || "AI stream error");
+              // 处理 agent_message 事件（兼容）
+              if (type === "agent_message") {
+                const chunk = evt?.message || evt?.answer || "";
+                if (chunk) {
+                  chunkQueue.push(chunk);
+                  processChunkQueue();
+                }
               }
 
+              // 处理错误事件
+              if (type === "error") {
+                streamEnded = true;
+                throw new Error(evt?.message || evt?.msg || "AI stream error");
+              }
+
+              // 消息结束时，做最终解析
               if (type === "message_end") {
-                if (evt?.conversation_id) cid = evt.conversation_id;
+                streamEnded = true;
+                if (evt?.conversation_id) {
+                  cid = evt.conversation_id;
+                }
+                // 等待队列处理完成后再做最终解析
+                const waitQueueEmpty = () => {
+                  if (chunkQueue.length > 0 || isProcessingQueue) {
+                    setTimeout(waitQueueEmpty, 100);
+                  } else {
+                    const parsed = this.parseStreamText(reply);
+                    this.messages[aiIndex].thinking = parsed.thinking || this.messages[aiIndex].thinking;
+                    this.messages[aiIndex].content = parsed.answer || this.messages[aiIndex].content;
+                    this.$nextTick(() => this.bumpScroll());
+                  }
+                };
+                waitQueueEmpty();
               }
             }
           });
+
+          // 等待队列处理完成后再做最终解析（防止遗漏）
+          const waitFinalProcess = () => {
+            if (chunkQueue.length > 0 || isProcessingQueue) {
+              setTimeout(waitFinalProcess, 100);
+            } else {
+              if (reply) {
+                const parsed = this.parseStreamText(reply);
+                this.messages[aiIndex].thinking = parsed.thinking;
+                this.messages[aiIndex].content = parsed.answer;
+                this.$nextTick(() => this.bumpScroll());
+              }
+            }
+          };
+          waitFinalProcess();
 
           if (cid) {
             this.conversationId = cid;
@@ -388,7 +511,7 @@ export default {
             this.fetchConversations();
           }
 
-          if (!this.messages[aiIndex].content) {
+          if (!this.messages[aiIndex].content || this.messages[aiIndex].content.trim() === "") {
             this.messages[aiIndex].content = "抱歉，没有收到回复，请稍后重试。";
           }
           // 更新消息时间戳
@@ -412,11 +535,13 @@ export default {
             this.fetchConversations();
           }
 
-          this.messages[aiIndex].content =
-            this.normalizeBlockingReply(data) || "抱歉，没有收到回复，请稍后重试。";
+          const parsed = this.normalizeBlockingReply(data);
+          this.messages[aiIndex].thinking = parsed.thinking;
+          this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
           this.messages[aiIndex].timestamp = Date.now();
         }
       } catch (e) {
+        this.messages[aiIndex].thinking = "";
         this.messages[aiIndex].content = "AI 服务暂时不可用，请稍后再试。";
         this.messages[aiIndex].timestamp = Date.now();
         uni.showToast({
@@ -617,6 +742,60 @@ export default {
   font-size: 30rpx;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.thinking-content {
+  margin-bottom: 16rpx;
+  background: #f7fafc;
+  border-radius: 12rpx;
+  border-left: 4rpx solid #cbd5e0;
+  overflow: hidden;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinking-label {
+  font-size: 24rpx;
+  color: #718096;
+  font-weight: 600;
+}
+
+.thinking-toggle {
+  font-size: 22rpx;
+  color: #4a5568;
+  opacity: 0.7;
+}
+
+.thinking-text-wrapper {
+  padding: 0 16rpx 16rpx 16rpx;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000rpx;
+  }
+}
+
+.thinking-text {
+  font-size: 26rpx;
+  color: #4a5568;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.8;
 }
 
 .typing-indicator {
