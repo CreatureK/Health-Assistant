@@ -52,13 +52,13 @@
                 </view>
                 <template v-else>
                   <!-- 思考内容 -->
-                  <view v-if="m.role === 'ai' && m.thinking" class="thinking-content">
+                  <view v-if="m.role === 'ai' && m.thinking !== undefined && m.thinking !== null" class="thinking-content">
                     <view class="thinking-header" @click="toggleThinking(i)">
                       <view class="thinking-label">思考过程</view>
                       <text class="thinking-toggle">{{ m.thinkingExpanded ? '收起' : '展开' }}</text>
                     </view>
                     <view v-if="m.thinkingExpanded" class="thinking-text-wrapper">
-                      <text class="thinking-text">{{ m.thinking }}</text>
+                      <text class="thinking-text">{{ m.thinking || '' }}</text>
                     </view>
                   </view>
                   <!-- 正式回答 -->
@@ -202,11 +202,13 @@ export default {
           // AI 消息
           if (msg.answer) {
             const parsed = this.parseStreamText(msg.answer);
+            // 如果有正式回答内容，默认收起思考内容；否则默认展开
+            const hasAnswer = parsed.answer && parsed.answer.trim();
             formattedMessages.push({
               role: "ai",
               content: parsed.answer,
               thinking: parsed.thinking,
-              thinkingExpanded: false,
+              thinkingExpanded: !hasAnswer,
               timestamp: msg.createdAt ? msg.createdAt * 1000 : Date.now()
             });
           }
@@ -341,17 +343,40 @@ export default {
         return { thinking: "", answer: "" };
       }
       
-      // 提取思考内容（匹配 <think>...</think> 或 <think>...</think>）
-      const thinkingMatch = text.match(/<think>([\s\S]*?)<\/redacted_reasoning>/i) || 
-                           text.match(/<think>([\s\S]*?)<\/think>/i);
-      const thinking = thinkingMatch ? thinkingMatch[1].trim() : "";
+      let thinking = "";
+      let answer = text;
       
-      // 提取正式回答（移除思考标签后的内容）
-      const answer = text
-        .replace(/<think>[\s\S]*?<\/redacted_reasoning>/gi, "")
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .replace(/\n+/g, "\n")
-        .trim();
+      // 检测是否有思考标签开始
+      const thinkingStartIndex = text.search(/<think>/i);
+      
+      if (thinkingStartIndex !== -1) {
+        // 查找结束标签位置
+        const thinkingEndMatch = text.match(/<\/redacted_reasoning>/i) || text.match(/<\/think>/i);
+        
+        if (thinkingEndMatch) {
+          // 有完整标签对：提取完整思考内容
+          const thinkingMatch = text.match(/<think>([\s\S]*?)<\/redacted_reasoning>/i) || 
+                               text.match(/<think>([\s\S]*?)<\/think>/i);
+          thinking = thinkingMatch ? thinkingMatch[1].trim() : "";
+          // 移除完整标签对
+          answer = text
+            .replace(/<think>[\s\S]*?<\/redacted_reasoning>/gi, "")
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
+            .replace(/\n+/g, "\n")
+            .trim();
+        } else {
+          // 只有开始标签，没有结束标签：提取从开始标签到文本末尾的内容
+          const thinkingStartTag = text.match(/<think>/i);
+          if (thinkingStartTag) {
+            const startPos = thinkingStartTag.index + thinkingStartTag[0].length;
+            thinking = text.substring(startPos).trim();
+            // 移除开始标签及之后的内容（因为都在思考中）
+            answer = text.substring(0, thinkingStartTag.index)
+              .replace(/\n+/g, "\n")
+              .trim();
+          }
+        }
+      }
       
       return { thinking, answer };
     },
@@ -374,7 +399,7 @@ export default {
       this.$nextTick(() => this.bumpScroll());
 
       // AI 占位消息（流式更新）
-      const aiMsg = { role: "ai", content: "", thinking: "", thinkingExpanded: false, timestamp: Date.now() };
+      const aiMsg = { role: "ai", content: "", thinking: undefined, thinkingExpanded: true, timestamp: Date.now() };
       this.messages.push(aiMsg);
       const aiIndex = this.messages.length - 1;
       this.$nextTick(() => this.bumpScroll());
@@ -410,13 +435,23 @@ export default {
             if (chunk) {
               reply += chunk;
               const parsed = this.parseStreamText(reply);
-              this.messages[aiIndex].thinking = parsed.thinking;
+              // parseStreamText 在检测到开始标签时会返回 thinking（即使为空字符串）
+              // 如果检测到开始标签，确保设置 thinking 字段（用于显示思考组件）
+              if (reply.includes('<think>')) {
+                this.messages[aiIndex].thinking = parsed.thinking !== undefined ? parsed.thinking : '';
+              } else if (parsed.thinking) {
+                this.messages[aiIndex].thinking = parsed.thinking;
+              }
               this.messages[aiIndex].content = parsed.answer;
+              // 当出现正式回答内容时，自动收起思考内容
+              if (parsed.answer && parsed.answer.trim()) {
+                this.messages[aiIndex].thinkingExpanded = false;
+              }
               this.$nextTick(() => this.bumpScroll());
             }
             
             // 随机延时
-            const delay = Math.random() * 30 + 20;
+            const delay = Math.random() * 15 + 20;
             setTimeout(() => {
               isProcessingQueue = false;
               // 如果队列还有内容或流未结束，继续处理
@@ -479,8 +514,17 @@ export default {
                     setTimeout(waitQueueEmpty, 100);
                   } else {
                     const parsed = this.parseStreamText(reply);
-                    this.messages[aiIndex].thinking = parsed.thinking || this.messages[aiIndex].thinking;
+                    // 如果检测到开始标签，即使thinking为空字符串也要设置
+                    if (reply.includes('<think>')) {
+                      this.messages[aiIndex].thinking = parsed.thinking !== undefined ? parsed.thinking : '';
+                    } else if (parsed.thinking) {
+                      this.messages[aiIndex].thinking = parsed.thinking;
+                    }
                     this.messages[aiIndex].content = parsed.answer || this.messages[aiIndex].content;
+                    // 当出现正式回答内容时，自动收起思考内容
+                    if (parsed.answer && parsed.answer.trim()) {
+                      this.messages[aiIndex].thinkingExpanded = false;
+                    }
                     this.$nextTick(() => this.bumpScroll());
                   }
                 };
@@ -498,6 +542,10 @@ export default {
                 const parsed = this.parseStreamText(reply);
                 this.messages[aiIndex].thinking = parsed.thinking;
                 this.messages[aiIndex].content = parsed.answer;
+                // 当出现正式回答内容时，自动收起思考内容
+                if (parsed.answer && parsed.answer.trim()) {
+                  this.messages[aiIndex].thinkingExpanded = false;
+                }
                 this.$nextTick(() => this.bumpScroll());
               }
             }
@@ -538,6 +586,10 @@ export default {
           const parsed = this.normalizeBlockingReply(data);
           this.messages[aiIndex].thinking = parsed.thinking;
           this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
+          // 当出现正式回答内容时，自动收起思考内容
+          if (parsed.answer && parsed.answer.trim()) {
+            this.messages[aiIndex].thinkingExpanded = false;
+          }
           this.messages[aiIndex].timestamp = Date.now();
         }
       } catch (e) {
