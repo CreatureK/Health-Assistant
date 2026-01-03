@@ -68,7 +68,8 @@ export const API = {
 
   // ✅ AI chat（新接口）
   aiChatMessages: "/ai/chat-messages",
-  aiConversations: "/ai/conversations"
+  aiConversations: "/ai/conversations",
+  aiMessages: "/ai/messages"
 };
 
 export const DIFY_API = {

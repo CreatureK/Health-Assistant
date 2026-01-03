@@ -113,11 +113,15 @@ export default {
       conversations: [],
       conversationsLoading: false,
       conversationSelectorVisible: false,
-      inputFocused: false
+      inputFocused: false,
+      messagesLoading: false
     };
   },
   onLoad() {
     this.fetchConversations();
+    if (this.conversationId) {
+      this.fetchMessages(this.conversationId);
+    }
   },
   onShow() {
     this.fetchConversations();
@@ -147,23 +151,92 @@ export default {
       this.conversationSelectorVisible = !this.conversationSelectorVisible;
     },
 
-    onSelectConversation(conversation) {
+    async fetchMessages(conversationId) {
+      if (!conversationId) return;
+      
+      this.messagesLoading = true;
+      try {
+        const data = await request({
+          url: API.aiMessages,
+          method: "GET",
+          data: {
+            conversation_id: conversationId,
+            limit: 50
+          }
+        });
+        
+        // 响应结构：data.data 是消息列表数组
+        const messageList = Array.isArray(data?.data) ? data.data : [];
+        
+        // 转换为前端消息格式
+        const formattedMessages = [];
+        for (const msg of messageList) {
+          // 用户消息
+          if (msg.query) {
+            formattedMessages.push({
+              role: "user",
+              content: msg.query,
+              timestamp: msg.createdAt ? msg.createdAt * 1000 : Date.now()
+            });
+          }
+          
+          // AI 消息
+          if (msg.answer) {
+            // 清理 <think> 标签（AI 内部推理过程）
+            let cleanAnswer = msg.answer;
+            cleanAnswer = cleanAnswer.replace(/<think>[\s\S]*?<\/redacted_reasoning>/g, "").trim();
+            
+            formattedMessages.push({
+              role: "ai",
+              content: cleanAnswer,
+              timestamp: msg.createdAt ? msg.createdAt * 1000 : Date.now()
+            });
+          }
+        }
+        
+        // 如果没有历史消息，显示欢迎语
+        if (formattedMessages.length === 0) {
+          this.messages = [
+            {
+              role: "ai",
+              content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+              timestamp: Date.now()
+            }
+          ];
+        } else {
+          this.messages = formattedMessages;
+        }
+        
+        this.$nextTick(() => this.bumpScroll());
+      } catch (e) {
+        console.error("[fetchMessages failed]", e);
+        uni.showToast({
+          title: e?.msg || e?.message || "加载消息失败",
+          icon: "none",
+          duration: 2000
+        });
+        // 失败时显示欢迎语
+        this.messages = [
+          {
+            role: "ai",
+            content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
+            timestamp: Date.now()
+          }
+        ];
+      } finally {
+        this.messagesLoading = false;
+      }
+    },
+
+    async onSelectConversation(conversation) {
       if (!conversation || !conversation.id) return;
       
-      // 切换会话：更新 conversationId，清空当前消息
+      // 切换会话：更新 conversationId
       this.conversationId = conversation.id;
       uni.setStorageSync("ai_conversation_id", conversation.id);
       
-      // 清空消息，显示欢迎语
-      this.messages = [
-        {
-          role: "ai",
-          content: "你好，我是 AI 健康助手。你可以描述症状或问题，我会给出科普建议。",
-          timestamp: Date.now()
-        }
-      ];
-      
-      this.$nextTick(() => this.bumpScroll());
+      // 加载该会话的历史消息
+      await this.fetchMessages(conversation.id);
     },
 
     formatMessageTime(timestamp) {
