@@ -1,6 +1,6 @@
 # Health-Assistant
 
-Health-Assistant 是一套基于 **Spring Boot + uni-app** 的健康助手系统，面向长期用药或慢病人群，提供 **用药计划管理、每日用药打卡、用药记录、药品库查询、健康文章** 等功能，并规划集成 **AI 对话（Dify）** 能力。
+Health-Assistant 是一套基于 **Spring Boot + uni-app** 的健康助手系统，面向长期用药或慢病人群，提供 **用药计划管理、每日用药打卡、用药记录、药品库查询、健康文章、AI 对话（Dify）** 等功能，并规划集成 **微信订阅** 能力。
 
 ---
 
