@@ -142,7 +142,6 @@ export default {
             })
         });
 
-        // 兼容：后端可能返回 {list,page,size,total} 或直接数组
         const list = Array.isArray(data) ? data : data?.list || [];
         const page = Array.isArray(data) ? this.page : Number(data?.page || this.page);
         const size = Array.isArray(data) ? this.size : Number(data?.size || this.size);
@@ -150,7 +149,7 @@ export default {
 
         this.total = total;
 
-        // 首次抽取分类（如果后端字段里带 category）
+        // 首次抽取分类
         if (reset && this.categories.length === 1) {
           const cats = Array.from(
             new Set(list.map((x) => x.category).filter(Boolean))
@@ -162,7 +161,6 @@ export default {
 
         // 判定是否结束
         if (Array.isArray(data)) {
-          // 如果后端直接给数组，就按“本次小于 size”判断
           if (list.length < this.size) this.finished = true;
         } else {
           const loaded = this.list.length;

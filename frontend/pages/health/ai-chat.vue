@@ -462,7 +462,7 @@ export default {
           };
 
           await requestSse({
-            url: API.aiChatMessages, // ✅ 必须是 /ai/chat-messages
+            url: API.aiChatMessages, // 必须是 /ai/chat-messages
             method: "POST",
             data: payload,
             onEvent: (evt) => {

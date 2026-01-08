@@ -74,7 +74,7 @@ export default {
       if (this.loading) return;
 
       try {
-        // ✅ request.js 已解包：这里直接拿到 payload
+        // request.js 已解包：这里直接拿到 payload
         // payload: { captchaId, imageBase64, expireIn }
         const cap = await request({ url: API.captcha, method: "GET" });
 
@@ -111,7 +111,7 @@ export default {
       this.loading = true;
 
       try {
-        // ✅ request.js 已解包：这里直接拿到 payload
+        // request.js 已解包：这里直接拿到 payload
         // payload: { token, user }
         const payload = await request({
           url: API.login,
@@ -138,7 +138,7 @@ export default {
         uni.showToast({ title: "登录成功", icon: "success" });
         uni.reLaunch({ url: "/pages/hub/entry" });
       } catch (e) {
-        // ✅ request.js 会把业务失败 reject 出来（包含 msg）
+        // request.js 会把业务失败 reject 出来（包含 msg）
         const msg = e?.msg || e?.message || "登录失败";
         uni.showToast({ title: msg, icon: "none" });
 
@@ -153,8 +153,4 @@ export default {
 </script>
 
 <style>
-/*
-  本页视觉样式统一放在全局样式：@/styles/common.css
-  这里保持空，避免和全局样式打架。
-*/
 </style>
