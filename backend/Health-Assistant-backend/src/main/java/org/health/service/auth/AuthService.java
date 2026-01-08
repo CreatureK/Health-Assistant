@@ -53,6 +53,9 @@ public class AuthService {
         // 生成Token
         String token = jwtUtil.generateToken(user.getId());
 
+        // 输出Token到终端
+        System.out.println("登录成功，Token: " + token);
+
         // 返回结果
         LoginResult result = new LoginResult();
         result.setToken(token);
