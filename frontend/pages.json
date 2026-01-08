@@ -1,5 +1,5 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+	"pages": [ //pages数组中第一项表示应用启动页
 			{
 			  "path": "pages/login/login",
 			  "style": { "navigationBarTitleText": "用户登录" }
@@ -50,7 +50,6 @@
 		      "style": { "navigationBarTitleText": "AI 健康助手" }
 		    },
 		
-		    // 新增：药品库（替代原健康日记）
 		    {
 		      "path": "pages/med/drug-list",
 		      "style": { "navigationBarTitleText": "药品库" }

@@ -1,7 +1,7 @@
 // common/request.js
 import { API } from "./api";
 
-// ✅ BASE_URL：优先环境变量，其次回退本地后端
+// BASE_URL：优先环境变量，其次回退本地后端
 // - vue-cli/uniapp：VUE_APP_BASE_URL
 // - Vite：VITE_BASE_URL
 const BASE_URL =
@@ -44,10 +44,10 @@ export function request({ url, method = "GET", data, header }) {
       
         const r = res.data;
       
-        // ✅ 按接口文档：统一返回 { code, msg, data }
+        // 按接口文档：统一返回 { code, msg, data }
         if (r && typeof r === "object" && Object.prototype.hasOwnProperty.call(r, "code")) {
           if (r.code === 200) {
-            // 🔥 只把 payload(data) 返回给页面，页面就能直接 data.token / data.list ...
+            // 只把 payload(data) 返回给页面，页面就能直接 data.token / data.list ...
             resolve(r.data);
           } else {
             // 业务失败：把 msg 透出，方便页面 toast
@@ -56,7 +56,7 @@ export function request({ url, method = "GET", data, header }) {
           return;
         }
       
-        // ✅ 兜底：如果后端不是统一包装，就原样返回
+        // 兜底：如果后端不是统一包装，就原样返回
         resolve(r);
       },
 
@@ -68,11 +68,11 @@ export function request({ url, method = "GET", data, header }) {
 }
 
 /**
- * ✅ SSE 流式请求（H5 专用：fetch + ReadableStream）
+ * SSE 流式请求（H5 专用：fetch + ReadableStream）
  * 后端返回 Content-Type: text/event-stream
  *
  * @param {Object} options
- * @param {string} options.url  例如：/ai/chat-messages
+ * @param {string} options.url  eg：/ai/chat-messages
  * @param {string} [options.method="POST"]
  * @param {Object} options.data
  * @param {(evt:any)=>void} options.onEvent

@@ -92,7 +92,6 @@ export default {
 
       this.loading = true;
       try {
-        // ⚠️ 这里需要后端提供注册接口（见第4点），如果你们暂时没接口，就先注释掉 request，保留 UI
         await request({
           url: API.register,
           method: "POST",
@@ -107,7 +106,6 @@ export default {
         uni.showToast({ title: "注册成功，请登录", icon: "none" });
         uni.redirectTo({ url: "/pages/login/login" });
       } catch (e) {
-        // request 内部已经 toast 过了，这里不重复
         this.fetchCaptcha();
       } finally {
         this.loading = false;
@@ -122,5 +120,4 @@ export default {
 </script>
 
 <style>
-/* 同 login.vue：样式走全局 styles/common.css */
 </style>

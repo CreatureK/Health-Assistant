@@ -45,10 +45,10 @@
 <script>
 import { request, API } from "@/common/request";
 
-// ✅ 开关：后端没做好就 true；后端好了改成 false
+// 开关：后端没做好就 true；后端好了改成 false
 const USE_MOCK = false;
 
-// ✅ 初始假数据（你可以随便改）
+// 初始假数据
 const DEFAULT_MOCK_PLANS = [
   {
     id: "m1",
@@ -97,13 +97,13 @@ export default {
     async fetchList() {
       this.loading = true;
       try {
-        // ✅ mock 模式：不调接口，直接用本地数据
+        // mock 模式：不调接口，直接用本地数据
         if (USE_MOCK) {
           this.list = loadMockPlans();
           return;
         }
 
-        // ✅ 正常模式：走后端接口
+        // 正常模式：走后端接口
         const data = await request({ url: API.medPlans, method: "GET" });
         this.list = Array.isArray(data) ? data : (data?.list || []);
       } finally {
@@ -111,7 +111,6 @@ export default {
       }
     },
 
-    // （你原来的展示方法保留）
     formatTimes(times) {
       if (Array.isArray(times)) return times.join("、");
       if (typeof times === "string") return times;
@@ -126,7 +125,7 @@ export default {
       return "每日";
     },
 
-    // ✅ mock 下：点“+ 新建”就直接本地加一条，方便你马上看效果
+    //mock 下：点“+ 新建”就直接本地加一条，方便你马上看效果
     goCreate() {
       if (!USE_MOCK) {
         uni.navigateTo({ url: "/pages/med/plan-edit" });
@@ -167,7 +166,7 @@ export default {
       uni.navigateTo({ url: "/pages/med/subscribe-guide" });
     },
 
-    // ✅ 删除：mock 模式下走本地删除；正常模式走后端 DELETE
+    // 删除：mock 模式下走本地删除；正常模式走后端 DELETE
     onDelete(id) {
       uni.showModal({
         title: "确认删除",

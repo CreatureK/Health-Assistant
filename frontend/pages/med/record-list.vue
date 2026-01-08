@@ -20,7 +20,7 @@
         </picker>
       </view>
 
-      <!-- 可选：一键切换模式（你不需要就删掉这块） -->
+      <!-- 可选：一键切换模式 -->
       <!-- <view class="row toggle-row">
         <button class="mini" @click="toggleMode">
           {{ useRealOnly ? "当前：真实接口（点我切前端示例模式）" : "当前：前端示例模式（点我切真实接口）" }}
@@ -63,7 +63,7 @@ function timeStr(offsetMin = 0) {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-// 示例记录（会根据筛选状态做过滤）
+// 示例记录（根据筛选状态做过滤）
 function mockRecords({ status, planId }) {
   const base = [
     { id: "mock-1", planId: planId || "p1", planName: "阿莫西林", dosage: "1粒", status: "todo",   time: timeStr(15),   actionAt: "" },
@@ -90,7 +90,7 @@ export default {
 
       mocking: false,
 
-      // ✅ 你期望的开关：
+      //开关：
       // true：不显示假数据（后端联调模式）
       // false：接口无数据/报错时显示假数据（前端做样式布局）
       useRealOnly: false,
@@ -130,8 +130,8 @@ export default {
 		    endDate: this.endDate,
 		  };
 		  
-		  if (this.planId) params.planId = Number(this.planId);          // ✅ 有才传，并转数字
-		  if (status !== "all") params.status = status;                  // ✅ 有筛选才传
+		  if (this.planId) params.planId = Number(this.planId);      
+		  if (status !== "all") params.status = status;                
 		  
 		  const data = await request({
 		    url: API.medRecords,
@@ -151,13 +151,13 @@ export default {
 
         const arr = Array.isArray(data) ? data : (data?.list || []);
 
-        // ✅ 真实接口有数据：直接展示
+        // 真实接口有数据：直接展示
         if (arr && arr.length) {
           this.list = arr;
           return;
         }
 
-        // ✅ 真实接口没数据：
+        // 真实接口没数据：
         // - 后端联调模式(useRealOnly=true)：不兜底，保持空列表
         // - 前端示例模式(useRealOnly=false)：塞 mock
         if (this.useRealOnly) {
@@ -167,8 +167,8 @@ export default {
           this.mocking = true;
         }
       } catch (err) {
-        // ✅ 请求报错：
-        // - 后端联调模式：不兜底，保持空列表（你也可以在这里加 toast）
+        // 请求报错：
+        // - 后端联调模式：不兜底，保持空列表
         // - 前端示例模式：塞 mock
         if (this.useRealOnly) {
           this.list = [];

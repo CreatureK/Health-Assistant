@@ -24,8 +24,9 @@
  * GET        /api/v1/wechat/subscribe/config
  * POST       /api/v1/wechat/subscribe/report
  *
- * AI（你自建后端）：
- * POST       /api/v1/ai/chat-messages   ✅（你 Swagger 里这个是存在的）
+ * AI（自建后端）：
+ * POST       /api/v1/ai/chat-messages   
+ * GET        /api/v1/ai/conversations   
  *
  * ================== Dify 官方 API（直连） ==================
  * POST /v1/chat-messages
@@ -65,8 +66,10 @@ export const API = {
   articles: "/articles",
   articleDetail: (id) => `/articles/${id}`,
 
-  // ✅ AI chat（新接口）
-  aiChatMessages: "/ai/chat-messages"
+  //  AI chat（新接口）
+  aiChatMessages: "/ai/chat-messages",
+  aiConversations: "/ai/conversations",
+  aiMessages: "/ai/messages"
 };
 
 export const DIFY_API = {

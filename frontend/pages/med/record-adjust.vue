@@ -72,7 +72,7 @@ export default {
       if (!this.recordId) return;
       this.loading = true;
       try {
-        // 通过 records 接口用 id 查询（契约里支持 id?）
+        // 通过 records 接口用 id 查询
         const data = await request({
           url: API.medRecords,
           method: "GET",
@@ -96,10 +96,10 @@ export default {
 
       this.saving = true;
       try {
-		  // ✅ 1) 先拼 actionAt
+		  // 1) 先拼 actionAt
 		  let actionAt = `${this.date}T${this.time}`;
 	  
-		  // ✅ 2) 补秒，变成 yyyy-MM-dd HH:mm:ss
+		  // 2) 补秒，变成 yyyy-MM-dd HH:mm:ss
 		  if (actionAt.length === 16) actionAt = actionAt + ":00";
         await request({
           url: API.medRecordAdjust(this.recordId),
