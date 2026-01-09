@@ -328,14 +328,181 @@ export default {
     },
 
     normalizeBlockingReply(data) {
-      if (!data) return { thinking: "", answer: "" };
+      if (!data) {
+        console.warn("[normalizeBlockingReply] data 为空");
+        return { thinking: "", answer: "" };
+      }
+      
+      console.log("[normalizeBlockingReply] 开始处理，数据类型:", typeof data);
+      
+      // 如果 data 是字符串，可能是 SSE 格式的文本，需要解析
+      if (typeof data === "string") {
+        console.log("[normalizeBlockingReply] 检测到字符串类型，尝试解析 SSE 格式");
+        // 尝试解析 SSE 格式的文本
+        const sseEvents = data.split('\n\n').filter(line => line.trim().startsWith('data:'));
+        console.log("[normalizeBlockingReply] SSE 事件数量:", sseEvents.length);
+        if (sseEvents.length > 0) {
+          // 累积所有 message 事件中的 answer 片段
+          let accumulatedAnswer = "";
+          let finalAnswer = null;
+          
+          // 先查找 message_end 事件，它包含完整的答案
+          for (let i = sseEvents.length - 1; i >= 0; i--) {
+            const line = sseEvents[i];
+            const jsonStr = line.replace(/^data:\s*/, '').trim();
+            if (!jsonStr) continue;
+            try {
+              const event = JSON.parse(jsonStr);
+              console.log("[normalizeBlockingReply] 解析 SSE 事件:", event.event || "unknown");
+              
+              if (event.event === 'message_end') {
+                // message_end 事件可能包含完整的答案
+                if (event.answer) {
+                  finalAnswer = event.answer;
+                  console.log("[normalizeBlockingReply] 找到 message_end 事件的完整答案");
+                  break;
+                } else if (event.outputs && event.outputs.answer) {
+                  finalAnswer = event.outputs.answer;
+                  console.log("[normalizeBlockingReply] 找到 message_end 事件的 outputs.answer");
+                  break;
+                } else if (event.data && event.data.outputs && event.data.outputs.answer) {
+                  finalAnswer = event.data.outputs.answer;
+                  console.log("[normalizeBlockingReply] 找到 message_end 事件的 data.outputs.answer");
+                  break;
+                }
+              }
+            } catch (e) {
+              console.warn("[normalizeBlockingReply] SSE 事件解析失败:", e.message);
+            }
+          }
+          
+          // 如果没有找到 message_end，则累积所有 message 事件的 answer
+          if (!finalAnswer) {
+            console.log("[normalizeBlockingReply] 未找到 message_end，开始累积 message 事件");
+            for (let i = 0; i < sseEvents.length; i++) {
+              const line = sseEvents[i];
+              const jsonStr = line.replace(/^data:\s*/, '').trim();
+              if (!jsonStr) continue;
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.event === 'message' && event.answer) {
+                  accumulatedAnswer += event.answer;
+                  console.log("[normalizeBlockingReply] 累积 message 事件 answer，当前长度:", accumulatedAnswer.length);
+                } else if (event.event === 'agent_message' && (event.message || event.answer)) {
+                  accumulatedAnswer += (event.message || event.answer);
+                  console.log("[normalizeBlockingReply] 累积 agent_message 事件，当前长度:", accumulatedAnswer.length);
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+            
+            if (accumulatedAnswer) {
+              finalAnswer = accumulatedAnswer;
+              console.log("[normalizeBlockingReply] 累积完成，总长度:", finalAnswer.length);
+            }
+          }
+          
+          // 如果还是没找到，尝试查找 workflow_finished 事件
+          if (!finalAnswer) {
+            console.log("[normalizeBlockingReply] 尝试查找 workflow_finished 事件");
+            for (let i = sseEvents.length - 1; i >= 0; i--) {
+              const line = sseEvents[i];
+              const jsonStr = line.replace(/^data:\s*/, '').trim();
+              if (!jsonStr) continue;
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.event === 'workflow_finished' && event.data && event.data.outputs && event.data.outputs.answer) {
+                  finalAnswer = event.data.outputs.answer;
+                  console.log("[normalizeBlockingReply] 找到 workflow_finished 事件的答案");
+                  break;
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+          
+          if (finalAnswer) {
+            console.log("[normalizeBlockingReply] 从 SSE 格式中提取到答案，长度:", finalAnswer.length);
+            return this.parseStreamText(finalAnswer);
+          } else {
+            console.warn("[normalizeBlockingReply] 无法从 SSE 格式中提取答案");
+          }
+        }
+        // 如果不是 SSE 格式，直接返回字符串
+        console.log("[normalizeBlockingReply] 字符串不是 SSE 格式，直接处理");
+        return this.parseStreamText(data);
+      }
+      
       let text = "";
-      if (typeof data === "string") text = data;
-      else if (data.answer) text = data.answer;
-      else if (data.data && data.data.answer) text = data.data.answer;
-      else if (data.data && typeof data.data === "string") text = data.data;
-      else text = data.msg || data.message || "";
-      return this.parseStreamText(text);
+      let foundPath = "";
+      
+      // 按优先级尝试不同的数据路径
+      if (data.answer) {
+        // 直接有 answer 字段
+        text = data.answer;
+        foundPath = "data.answer";
+      } else if (data.outputs && data.outputs.answer) {
+        // outputs.answer（workflow_finished 事件格式）
+        text = data.outputs.answer;
+        foundPath = "data.outputs.answer";
+      } else if (data.data) {
+        if (typeof data.data === "string") {
+          text = data.data;
+          foundPath = "data.data (string)";
+        } else if (data.data.answer) {
+          // data.data.answer
+          text = data.data.answer;
+          foundPath = "data.data.answer";
+        } else if (data.data.outputs && data.data.outputs.answer) {
+          // data.data.outputs.answer（嵌套结构）
+          text = data.data.outputs.answer;
+          foundPath = "data.data.outputs.answer";
+        }
+      } else {
+        text = data.msg || data.message || "";
+        foundPath = text ? (data.msg ? "data.msg" : "data.message") : "";
+      }
+      
+      if (foundPath) {
+        console.log("[normalizeBlockingReply] 通过路径找到答案:", foundPath, "长度:", text.length);
+      }
+      
+      // 如果 text 还是空的，尝试从整个对象中递归查找 answer 字段
+      if (!text && typeof data === "object") {
+        console.log("[normalizeBlockingReply] 尝试递归查找 answer 字段");
+        const findAnswer = (obj, depth = 0) => {
+          if (depth > 5 || !obj || typeof obj !== "object") return null; // 限制递归深度
+          if (obj.answer && typeof obj.answer === "string") return obj.answer;
+          for (const key in obj) {
+            if (key === "answer" && typeof obj[key] === "string") {
+              return obj[key];
+            }
+            const result = findAnswer(obj[key], depth + 1);
+            if (result) return result;
+          }
+          return null;
+        };
+        const found = findAnswer(data);
+        if (found) {
+          text = found;
+          foundPath = "递归查找";
+          console.log("[normalizeBlockingReply] 通过递归查找找到答案，长度:", text.length);
+        }
+      }
+      
+      // 如果仍然没有找到，记录日志以便调试
+      if (!text) {
+        console.warn("[normalizeBlockingReply] 无法提取答案");
+        console.warn("[normalizeBlockingReply] 原始数据:", JSON.stringify(data, null, 2));
+        console.warn("[normalizeBlockingReply] 数据键:", Object.keys(data || {}));
+      }
+      
+      const result = this.parseStreamText(text);
+      console.log("[normalizeBlockingReply] 最终解析结果 - thinking长度:", result.thinking.length, "answer长度:", result.answer.length);
+      
+      return result;
     },
 
     parseStreamText(text) {
@@ -413,7 +580,14 @@ export default {
           autoGenerateName: true
         };
 
-        const isH5 = typeof window !== "undefined" && typeof fetch !== "undefined";
+        // 检测是否为真正的 H5 浏览器环境
+        let isH5;
+        // #ifdef H5
+        isH5 = typeof window !== "undefined" && typeof fetch !== "undefined";
+        // #endif
+        // #ifndef H5
+        isH5 = false; // 非 H5 环境（小程序、APP等）强制使用 blocking
+        // #endif
 
         if (isH5) {
           let reply = "";
@@ -566,31 +740,62 @@ export default {
           this.messages[aiIndex].timestamp = Date.now();
         } else {
           // 非 H5：走 blocking（uni.request 没法读 SSE 流）
-          const data = await request({
-            url: API.aiChatMessages,
-            method: "POST",
-            data: { ...payload, responseMode: "blocking" }
-          });
+          try {
+            const data = await request({
+              url: API.aiChatMessages,
+              method: "POST",
+              data: { ...payload, responseMode: "blocking" }
+            });
 
-          const cid =
-            data?.conversation_id ||
-            data?.conversationId ||
-            data?.conversationID ||
-            "";
-          if (cid) {
-            this.conversationId = cid;
-            uni.setStorageSync("ai_conversation_id", cid);
-            this.fetchConversations();
-          }
+            // 数据到达后再输出调试信息
+            console.log("[blocking mode] 原始响应数据:", data);
+            console.log("[blocking mode] 数据类型:", typeof data);
+            if (typeof data === "string") {
+              console.log("[blocking mode] 字符串长度:", data.length);
+              console.log("[blocking mode] 字符串前100字符:", data.substring(0, 100));
+            } else if (data && typeof data === "object") {
+              console.log("[blocking mode] 数据键:", Object.keys(data));
+            }
 
-          const parsed = this.normalizeBlockingReply(data);
-          this.messages[aiIndex].thinking = parsed.thinking;
-          this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
-          // 当出现正式回答内容时，自动收起思考内容
-          if (parsed.answer && parsed.answer.trim()) {
-            this.messages[aiIndex].thinkingExpanded = false;
+            const cid =
+              data?.conversation_id ||
+              data?.conversationId ||
+              data?.conversationID ||
+              data?.data?.conversation_id ||
+              data?.data?.conversationId ||
+              "";
+            console.log("[blocking mode] conversation_id:", cid);
+            if (cid) {
+              this.conversationId = cid;
+              uni.setStorageSync("ai_conversation_id", cid);
+              this.fetchConversations();
+            }
+
+            const parsed = this.normalizeBlockingReply(data);
+            console.log("[blocking mode] 解析后的数据:", parsed);
+            console.log("[blocking mode] thinking长度:", parsed.thinking ? parsed.thinking.length : 0);
+            console.log("[blocking mode] answer长度:", parsed.answer ? parsed.answer.length : 0);
+            console.log("[blocking mode] answer内容:", parsed.answer ? parsed.answer.substring(0, 100) : "空");
+            
+            this.messages[aiIndex].thinking = parsed.thinking;
+            this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
+            // 当出现正式回答内容时，自动收起思考内容
+            if (parsed.answer && parsed.answer.trim()) {
+              this.messages[aiIndex].thinkingExpanded = false;
+            }
+            this.messages[aiIndex].timestamp = Date.now();
+          } catch (blockingError) {
+            console.error("[blocking mode] 请求失败:", blockingError);
+            console.error("[blocking mode] 错误详情:", blockingError?.msg || blockingError?.message || blockingError);
+            this.messages[aiIndex].thinking = "";
+            this.messages[aiIndex].content = "AI 服务暂时不可用，请稍后再试。";
+            this.messages[aiIndex].timestamp = Date.now();
+            uni.showToast({
+              title: blockingError?.msg || blockingError?.message || "请求失败",
+              icon: "none",
+              duration: 2000
+            });
           }
-          this.messages[aiIndex].timestamp = Date.now();
         }
       } catch (e) {
         this.messages[aiIndex].thinking = "";
