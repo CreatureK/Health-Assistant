@@ -554,6 +554,39 @@ export default {
       }
     },
 
+    typewriterEffect(aiIndex, fullText, isThinking = false) {
+      if (!fullText || !fullText.trim()) return Promise.resolve();
+      
+      return new Promise((resolve) => {
+        const chars = fullText.split('');
+        let currentIndex = 0;
+        const delay = () => Math.random() * 15 + 20; // 20-35ms 随机延时
+        
+        const typeNextChar = () => {
+          if (currentIndex >= chars.length) {
+            resolve();
+            return;
+          }
+          
+          // 添加下一个字符
+          const currentText = chars.slice(0, currentIndex + 1).join('');
+          
+          if (isThinking) {
+            this.messages[aiIndex].thinking = currentText;
+          } else {
+            this.messages[aiIndex].content = currentText;
+          }
+          
+          this.$nextTick(() => this.bumpScroll());
+          currentIndex++;
+          
+          setTimeout(typeNextChar, delay());
+        };
+        
+        typeNextChar();
+      });
+    },
+
     async send() {
       const content = (this.input || "").trim();
       if (!content || this.loading) return;
@@ -777,12 +810,36 @@ export default {
             console.log("[blocking mode] answer长度:", parsed.answer ? parsed.answer.length : 0);
             console.log("[blocking mode] answer内容:", parsed.answer ? parsed.answer.substring(0, 100) : "空");
             
-            this.messages[aiIndex].thinking = parsed.thinking;
-            this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
-            // 当出现正式回答内容时，自动收起思考内容
-            if (parsed.answer && parsed.answer.trim()) {
-              this.messages[aiIndex].thinkingExpanded = false;
+            // 使用打字机效果显示
+            try {
+              if (parsed.thinking && parsed.thinking.trim()) {
+                // 先显示思考内容
+                this.messages[aiIndex].thinking = "";
+                await this.typewriterEffect(aiIndex, parsed.thinking, true);
+                
+                // 思考内容显示完成后，如果有正式回答，自动收起思考
+                if (parsed.answer && parsed.answer.trim()) {
+                  this.messages[aiIndex].thinkingExpanded = false;
+                }
+              }
+
+              if (parsed.answer && parsed.answer.trim()) {
+                // 显示正式回答
+                this.messages[aiIndex].content = "";
+                await this.typewriterEffect(aiIndex, parsed.answer, false);
+              } else {
+                this.messages[aiIndex].content = "抱歉，没有收到回复，请稍后重试。";
+              }
+            } catch (typewriterError) {
+              // 如果打字机效果失败，直接显示完整内容作为降级方案
+              console.warn("[blocking mode] 打字机效果失败，使用降级方案:", typewriterError);
+              this.messages[aiIndex].thinking = parsed.thinking || "";
+              this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
+              if (parsed.answer && parsed.answer.trim()) {
+                this.messages[aiIndex].thinkingExpanded = false;
+              }
             }
+            
             this.messages[aiIndex].timestamp = Date.now();
           } catch (blockingError) {
             console.error("[blocking mode] 请求失败:", blockingError);
