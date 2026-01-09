@@ -126,7 +126,9 @@ export default {
       conversationsLoading: false,
       conversationSelectorVisible: false,
       inputFocused: false,
-      messagesLoading: false
+      messagesLoading: false,
+      _isPageDestroyed: false,
+      _timers: []
     };
   },
   onLoad() {
@@ -144,6 +146,15 @@ export default {
   },
   onShow() {
     this.fetchConversations();
+  },
+  onUnload() {
+    this._isPageDestroyed = true;
+    this._timers.forEach(timerId => {
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+    });
+    this._timers = [];
   },
   methods: {
     async fetchConversations() {
@@ -280,23 +291,33 @@ export default {
     },
 
     bumpScroll() {
-      if (this._scrollLock) return;
+      if (this._scrollLock || this._isPageDestroyed) return;
       this._scrollLock = true;
       this.$nextTick(() => {
+        if (this._isPageDestroyed) return;
         const lastIndex = this.messages.length - 1;
         if (lastIndex >= 0) {
           this.scrollIntoView = `msg-${lastIndex}`;
         }
-        setTimeout(() => {
-          this.scrollTop += 999999;
-          this._scrollLock = false;
+        const timerId = setTimeout(() => {
+          if (!this._isPageDestroyed) {
+            this.scrollTop += 999999;
+            this._scrollLock = false;
+          }
         }, 100);
+        this._timers.push(timerId);
       });
     },
 
     onInputFocus() {
+      if (this._isPageDestroyed) return;
       this.inputFocused = true;
-      setTimeout(() => this.bumpScroll(), 300);
+      const timerId = setTimeout(() => {
+        if (!this._isPageDestroyed) {
+          this.bumpScroll();
+        }
+      }, 300);
+      this._timers.push(timerId);
     },
 
     onInputBlur() {
@@ -329,18 +350,13 @@ export default {
 
     normalizeBlockingReply(data) {
       if (!data) {
-        console.warn("[normalizeBlockingReply] data 为空");
         return { thinking: "", answer: "" };
       }
       
-      console.log("[normalizeBlockingReply] 开始处理，数据类型:", typeof data);
-      
       // 如果 data 是字符串，可能是 SSE 格式的文本，需要解析
       if (typeof data === "string") {
-        console.log("[normalizeBlockingReply] 检测到字符串类型，尝试解析 SSE 格式");
         // 尝试解析 SSE 格式的文本
         const sseEvents = data.split('\n\n').filter(line => line.trim().startsWith('data:'));
-        console.log("[normalizeBlockingReply] SSE 事件数量:", sseEvents.length);
         if (sseEvents.length > 0) {
           // 累积所有 message 事件中的 answer 片段
           let accumulatedAnswer = "";
@@ -353,32 +369,27 @@ export default {
             if (!jsonStr) continue;
             try {
               const event = JSON.parse(jsonStr);
-              console.log("[normalizeBlockingReply] 解析 SSE 事件:", event.event || "unknown");
               
               if (event.event === 'message_end') {
                 // message_end 事件可能包含完整的答案
                 if (event.answer) {
                   finalAnswer = event.answer;
-                  console.log("[normalizeBlockingReply] 找到 message_end 事件的完整答案");
                   break;
                 } else if (event.outputs && event.outputs.answer) {
                   finalAnswer = event.outputs.answer;
-                  console.log("[normalizeBlockingReply] 找到 message_end 事件的 outputs.answer");
                   break;
                 } else if (event.data && event.data.outputs && event.data.outputs.answer) {
                   finalAnswer = event.data.outputs.answer;
-                  console.log("[normalizeBlockingReply] 找到 message_end 事件的 data.outputs.answer");
                   break;
                 }
               }
             } catch (e) {
-              console.warn("[normalizeBlockingReply] SSE 事件解析失败:", e.message);
+              // 忽略解析错误
             }
           }
           
           // 如果没有找到 message_end，则累积所有 message 事件的 answer
           if (!finalAnswer) {
-            console.log("[normalizeBlockingReply] 未找到 message_end，开始累积 message 事件");
             for (let i = 0; i < sseEvents.length; i++) {
               const line = sseEvents[i];
               const jsonStr = line.replace(/^data:\s*/, '').trim();
@@ -387,10 +398,8 @@ export default {
                 const event = JSON.parse(jsonStr);
                 if (event.event === 'message' && event.answer) {
                   accumulatedAnswer += event.answer;
-                  console.log("[normalizeBlockingReply] 累积 message 事件 answer，当前长度:", accumulatedAnswer.length);
                 } else if (event.event === 'agent_message' && (event.message || event.answer)) {
                   accumulatedAnswer += (event.message || event.answer);
-                  console.log("[normalizeBlockingReply] 累积 agent_message 事件，当前长度:", accumulatedAnswer.length);
                 }
               } catch (e) {
                 // 忽略解析错误
@@ -399,13 +408,11 @@ export default {
             
             if (accumulatedAnswer) {
               finalAnswer = accumulatedAnswer;
-              console.log("[normalizeBlockingReply] 累积完成，总长度:", finalAnswer.length);
             }
           }
           
           // 如果还是没找到，尝试查找 workflow_finished 事件
           if (!finalAnswer) {
-            console.log("[normalizeBlockingReply] 尝试查找 workflow_finished 事件");
             for (let i = sseEvents.length - 1; i >= 0; i--) {
               const line = sseEvents[i];
               const jsonStr = line.replace(/^data:\s*/, '').trim();
@@ -414,7 +421,6 @@ export default {
                 const event = JSON.parse(jsonStr);
                 if (event.event === 'workflow_finished' && event.data && event.data.outputs && event.data.outputs.answer) {
                   finalAnswer = event.data.outputs.answer;
-                  console.log("[normalizeBlockingReply] 找到 workflow_finished 事件的答案");
                   break;
                 }
               } catch (e) {
@@ -424,54 +430,38 @@ export default {
           }
           
           if (finalAnswer) {
-            console.log("[normalizeBlockingReply] 从 SSE 格式中提取到答案，长度:", finalAnswer.length);
             return this.parseStreamText(finalAnswer);
-          } else {
-            console.warn("[normalizeBlockingReply] 无法从 SSE 格式中提取答案");
           }
         }
         // 如果不是 SSE 格式，直接返回字符串
-        console.log("[normalizeBlockingReply] 字符串不是 SSE 格式，直接处理");
         return this.parseStreamText(data);
       }
       
       let text = "";
-      let foundPath = "";
       
       // 按优先级尝试不同的数据路径
       if (data.answer) {
         // 直接有 answer 字段
         text = data.answer;
-        foundPath = "data.answer";
       } else if (data.outputs && data.outputs.answer) {
         // outputs.answer（workflow_finished 事件格式）
         text = data.outputs.answer;
-        foundPath = "data.outputs.answer";
       } else if (data.data) {
         if (typeof data.data === "string") {
           text = data.data;
-          foundPath = "data.data (string)";
         } else if (data.data.answer) {
           // data.data.answer
           text = data.data.answer;
-          foundPath = "data.data.answer";
         } else if (data.data.outputs && data.data.outputs.answer) {
           // data.data.outputs.answer（嵌套结构）
           text = data.data.outputs.answer;
-          foundPath = "data.data.outputs.answer";
         }
       } else {
         text = data.msg || data.message || "";
-        foundPath = text ? (data.msg ? "data.msg" : "data.message") : "";
-      }
-      
-      if (foundPath) {
-        console.log("[normalizeBlockingReply] 通过路径找到答案:", foundPath, "长度:", text.length);
       }
       
       // 如果 text 还是空的，尝试从整个对象中递归查找 answer 字段
       if (!text && typeof data === "object") {
-        console.log("[normalizeBlockingReply] 尝试递归查找 answer 字段");
         const findAnswer = (obj, depth = 0) => {
           if (depth > 5 || !obj || typeof obj !== "object") return null; // 限制递归深度
           if (obj.answer && typeof obj.answer === "string") return obj.answer;
@@ -487,20 +477,10 @@ export default {
         const found = findAnswer(data);
         if (found) {
           text = found;
-          foundPath = "递归查找";
-          console.log("[normalizeBlockingReply] 通过递归查找找到答案，长度:", text.length);
         }
       }
       
-      // 如果仍然没有找到，记录日志以便调试
-      if (!text) {
-        console.warn("[normalizeBlockingReply] 无法提取答案");
-        console.warn("[normalizeBlockingReply] 原始数据:", JSON.stringify(data, null, 2));
-        console.warn("[normalizeBlockingReply] 数据键:", Object.keys(data || {}));
-      }
-      
       const result = this.parseStreamText(text);
-      console.log("[normalizeBlockingReply] 最终解析结果 - thinking长度:", result.thinking.length, "answer长度:", result.answer.length);
       
       return result;
     },
@@ -555,7 +535,7 @@ export default {
     },
 
     typewriterEffect(aiIndex, fullText, isThinking = false) {
-      if (!fullText || !fullText.trim()) return Promise.resolve();
+      if (!fullText || !fullText.trim() || this._isPageDestroyed) return Promise.resolve();
       
       return new Promise((resolve) => {
         const chars = fullText.split('');
@@ -563,7 +543,7 @@ export default {
         const delay = () => Math.random() * 15 + 20; // 20-35ms 随机延时
         
         const typeNextChar = () => {
-          if (currentIndex >= chars.length) {
+          if (this._isPageDestroyed || currentIndex >= chars.length) {
             resolve();
             return;
           }
@@ -580,7 +560,8 @@ export default {
           this.$nextTick(() => this.bumpScroll());
           currentIndex++;
           
-          setTimeout(typeNextChar, delay());
+          const timerId = setTimeout(typeNextChar, delay());
+          this._timers.push(timerId);
         };
         
         typeNextChar();
@@ -634,12 +615,12 @@ export default {
           
           // 处理队列中的chunk，带随机延时
           const processChunkQueue = () => {
-            if (isProcessingQueue || chunkQueue.length === 0) return;
+            if (this._isPageDestroyed || isProcessingQueue || chunkQueue.length === 0) return;
             
             isProcessingQueue = true;
             const chunk = chunkQueue.shift();
             
-            if (chunk) {
+            if (chunk && !this._isPageDestroyed) {
               reply += chunk;
               const parsed = this.parseStreamText(reply);
               // parseStreamText 在检测到开始标签时会返回 thinking（即使为空字符串）
@@ -659,13 +640,16 @@ export default {
             
             // 随机延时
             const delay = Math.random() * 15 + 20;
-            setTimeout(() => {
-              isProcessingQueue = false;
-              // 如果队列还有内容或流未结束，继续处理
-              if (chunkQueue.length > 0 || !streamEnded) {
-                processChunkQueue();
+            const timerId = setTimeout(() => {
+              if (!this._isPageDestroyed) {
+                isProcessingQueue = false;
+                // 如果队列还有内容或流未结束，继续处理
+                if (chunkQueue.length > 0 || !streamEnded) {
+                  processChunkQueue();
+                }
               }
             }, delay);
+            this._timers.push(timerId);
           };
 
           await requestSse({
@@ -717,8 +701,10 @@ export default {
                 }
                 // 等待队列处理完成后再做最终解析
                 const waitQueueEmpty = () => {
+                  if (this._isPageDestroyed) return;
                   if (chunkQueue.length > 0 || isProcessingQueue) {
-                    setTimeout(waitQueueEmpty, 100);
+                    const timerId = setTimeout(waitQueueEmpty, 100);
+                    this._timers.push(timerId);
                   } else {
                     const parsed = this.parseStreamText(reply);
                     // 如果检测到开始标签，即使thinking为空字符串也要设置
@@ -742,10 +728,12 @@ export default {
 
           // 等待队列处理完成后再做最终解析（防止遗漏）
           const waitFinalProcess = () => {
+            if (this._isPageDestroyed) return;
             if (chunkQueue.length > 0 || isProcessingQueue) {
-              setTimeout(waitFinalProcess, 100);
+              const timerId = setTimeout(waitFinalProcess, 100);
+              this._timers.push(timerId);
             } else {
-              if (reply) {
+              if (reply && !this._isPageDestroyed) {
                 const parsed = this.parseStreamText(reply);
                 this.messages[aiIndex].thinking = parsed.thinking;
                 this.messages[aiIndex].content = parsed.answer;
@@ -780,16 +768,6 @@ export default {
               data: { ...payload, responseMode: "blocking" }
             });
 
-            // 数据到达后再输出调试信息
-            console.log("[blocking mode] 原始响应数据:", data);
-            console.log("[blocking mode] 数据类型:", typeof data);
-            if (typeof data === "string") {
-              console.log("[blocking mode] 字符串长度:", data.length);
-              console.log("[blocking mode] 字符串前100字符:", data.substring(0, 100));
-            } else if (data && typeof data === "object") {
-              console.log("[blocking mode] 数据键:", Object.keys(data));
-            }
-
             const cid =
               data?.conversation_id ||
               data?.conversationId ||
@@ -797,7 +775,6 @@ export default {
               data?.data?.conversation_id ||
               data?.data?.conversationId ||
               "";
-            console.log("[blocking mode] conversation_id:", cid);
             if (cid) {
               this.conversationId = cid;
               uni.setStorageSync("ai_conversation_id", cid);
@@ -805,10 +782,6 @@ export default {
             }
 
             const parsed = this.normalizeBlockingReply(data);
-            console.log("[blocking mode] 解析后的数据:", parsed);
-            console.log("[blocking mode] thinking长度:", parsed.thinking ? parsed.thinking.length : 0);
-            console.log("[blocking mode] answer长度:", parsed.answer ? parsed.answer.length : 0);
-            console.log("[blocking mode] answer内容:", parsed.answer ? parsed.answer.substring(0, 100) : "空");
             
             // 使用打字机效果显示
             try {
@@ -832,7 +805,6 @@ export default {
               }
             } catch (typewriterError) {
               // 如果打字机效果失败，直接显示完整内容作为降级方案
-              console.warn("[blocking mode] 打字机效果失败，使用降级方案:", typewriterError);
               this.messages[aiIndex].thinking = parsed.thinking || "";
               this.messages[aiIndex].content = parsed.answer || "抱歉，没有收到回复，请稍后重试。";
               if (parsed.answer && parsed.answer.trim()) {
@@ -843,7 +815,6 @@ export default {
             this.messages[aiIndex].timestamp = Date.now();
           } catch (blockingError) {
             console.error("[blocking mode] 请求失败:", blockingError);
-            console.error("[blocking mode] 错误详情:", blockingError?.msg || blockingError?.message || blockingError);
             this.messages[aiIndex].thinking = "";
             this.messages[aiIndex].content = "AI 服务暂时不可用，请稍后再试。";
             this.messages[aiIndex].timestamp = Date.now();
@@ -931,7 +902,7 @@ export default {
   flex: 1;
   padding: 24rpx;
   overflow-y: auto;
-  padding-bottom: 140rpx;
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
 }
 
 .chat-inner {
@@ -1155,15 +1126,15 @@ export default {
 
 .composer {
   position: fixed;
-  bottom: 20rpx;
+  bottom: 0;
   left: 0;
   right: 0;
-  background: transparent;
+  background: #ffffff;
   padding: 20rpx 24rpx;
   padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid #e2e8f0;
-  box-shadow: 0 -4rpx 12rpx rgba(0, 0, 0, 0.04);
-  z-index: 999;
+  box-shadow: 0 -4rpx 12rpx rgba(0, 0, 0, 0.08);
+  z-index: 1001;
 }
 
 .composer-inner {
